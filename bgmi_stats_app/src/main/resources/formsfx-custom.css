@@ -1,0 +1,77 @@
+/* --- BASE FORMSFX RENDERER --- */
+.form-renderer {
+    -fx-background-color: #0B0F19;
+    -fx-padding: 20px;
+}
+
+/* --- TITLES AND HEADINGS --- */
+.form-renderer .title-label {
+    -fx-text-fill: white;
+    -fx-font-family: "Arial";
+    -fx-font-weight: bold;
+    -fx-font-size: 22px;
+}
+
+.form-renderer .group-label {
+    -fx-text-fill: #8B5CF6;
+    /* GamerVault Accent Purple */
+    -fx-font-family: "Arial";
+    -fx-font-weight: bold;
+    -fx-font-size: 16px;
+    -fx-padding: 15 0 5 0;
+}
+
+/* --- FIXING THE ELLIPSES (Label Truncation) --- */
+.form-renderer .field-label {
+    -fx-text-fill: white;
+    -fx-font-family: "Arial";
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-wrap-text: true;
+    /* Forces wrapping instead of ellipses */
+    -fx-min-width: 160px;
+    /* Gives labels enough space to prevent clipping */
+    -fx-pref-width: 160px;
+}
+
+/* --- TEXT FIELDS & TEXT AREAS (Glassmorphism look) --- */
+.form-renderer .text-input,
+.form-renderer .text-area {
+    -fx-background-color: #1A1D29;
+    /* Dark input background */
+    -fx-text-fill: white;
+    /* White text inside fields */
+    -fx-prompt-text-fill: #6B7280;
+    /* Muted placeholder text */
+    -fx-border-color: #374151;
+    /* Dark border */
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.form-renderer .text-input:focused,
+.form-renderer .text-area:focused {
+    -fx-border-color: #8B5CF6;
+    /* Purple glow on focus */
+    -fx-border-width: 1.5px;
+}
+
+/* --- COMBO BOX (Dropdowns) --- */
+.form-renderer .combo-box {
+    -fx-background-color: #1A1D29;
+    -fx-text-fill: white;
+}
+
+.form-renderer .combo-box .list-cell {
+    -fx-text-fill: white;
+}
+
+.form-renderer .combo-box-popup .list-view {
+    -fx-background-color: #0B0F19;
+    -fx-border-color: #8B5CF6;
+}
+
+.form-renderer .combo-box-popup .list-cell:hover {
+    -fx-background-color: #8B5CF6;
+    -fx-text-fill: white;
+}
