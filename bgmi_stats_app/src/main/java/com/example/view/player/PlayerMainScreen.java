@@ -37,6 +37,8 @@ public class PlayerMainScreen {
     Scene playerMainScreenScene;
     Stage playerMainScreenStage;
 
+    public String activeBattleId; // Stores the ID when transitioning to the room
+
     // METHODS
 
     // Setters for the scene and stage for the player's main screen
@@ -98,8 +100,19 @@ public class PlayerMainScreen {
                 return new PortfolioGeneratorScreen().startPortfolioGeneratorScreen();
             case "leaderboard":
                 return new LeaderboardScreen().startLeaderboardScreen();
+            case "battleArena":
+                return new BattleArenaScreen().startBattleArenaScreen(this);
+            case "activeBattleRoom":
+                if (activeBattleId == null || activeBattleId.trim().isEmpty()) {
+                    System.err.println("Prevented crash: No Active Battle ID found. Redirecting to Arena.");
+                    PlayerDashboardSidebar.pageView = "battleArena";
+                    return new BattleArenaScreen().startBattleArenaScreen(this);
+                }
+                return new ActiveBattleRoomScreen().startBattleRoomScreen(this, activeBattleId);
             case "recruitmentHub":
                 return new RecruitmentHubScreen().startRecruitmentHubScreen();
+            case "scoutsInbox":
+                return new RecruitmentInboxScreen().startRecruitmentInboxScreen();
             case "profile":
                 return new ProfileScreen().startProfileScreen();
             case "discover_content":

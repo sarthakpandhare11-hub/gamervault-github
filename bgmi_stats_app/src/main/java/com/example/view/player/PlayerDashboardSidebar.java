@@ -116,12 +116,27 @@ public class PlayerDashboardSidebar {
             System.out.println("DEBUG: SIDEBAR LEADERBOARD CLICKED");
         });
 
+        Button battleArenaBtn = new Button("⚔  Battle Arena");
+        applyStyling(battleArenaBtn, pageView.equals("battleArena"));
+        battleArenaBtn.setOnAction(event -> {
+            pageView = "battleArena";
+            mainScreen.updateCenter();
+        });
+
         Button recruitmentHubButton = new Button("🤝  Recruitment Hub");
         applyStyling(recruitmentHubButton, pageView.equals("recruitmentHub"));
         recruitmentHubButton.setOnAction(event -> {
             pageView = "recruitmentHub";
             mainScreen.updateCenter();
             System.out.println("DEBUG: SIDEBAR RECRUITMENT HUB CLICKED");
+        });
+
+        Button inboxBtn = new Button("📥 Scout's Inbox");
+        applyStyling(inboxBtn, pageView.equals("scoutsInbox"));
+        inboxBtn.setOnAction(event -> {
+            pageView = "scoutsInbox";
+            mainScreen.updateCenter();
+            System.out.println("DEBUG: SIDEBAR SCOUT'S INBOX CLICKED");
         });
 
         Button profileButton = new Button("👤  Profile");
@@ -147,7 +162,9 @@ public class PlayerDashboardSidebar {
                 analyticsButton,
                 portfolioGeneratorButton,
                 leaderboardButton,
+                battleArenaBtn,
                 recruitmentHubButton,
+                inboxBtn,
                 profileButton);
 
         Region spacer = new Region();
