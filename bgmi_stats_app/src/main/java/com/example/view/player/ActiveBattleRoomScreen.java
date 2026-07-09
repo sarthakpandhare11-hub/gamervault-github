@@ -1,9 +1,13 @@
 package com.example.view.player;
 
+import java.io.File;
+
 import com.example.controller.AuthController;
 import com.example.controller.player.BattleRoomController;
+import com.example.dao.BattleDao;
 import com.example.keys.BattleFirebaseKeys;
 import com.example.model.player.BattleModel;
+import com.example.model.player.RoundModel;
 import com.example.view.util.GamerVaultAnimations;
 import com.example.view.util.GamerVaultStyles;
 import com.example.view.util.SizedBox;
@@ -11,8 +15,13 @@ import com.example.view.util.SizedBox;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.scene.effect.GaussianBlur;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -21,6 +30,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
+import javafx.stage.FileChooser;
 
 public class ActiveBattleRoomScreen {
 
@@ -45,7 +55,10 @@ public class ActiveBattleRoomScreen {
         root.setStyle("-fx-background-color: transparent;");
 
         // Top Navigation
-        Button backBtn = new Button("← Leave Lobby");
+        HBox topNav = new HBox(15);
+        topNav.setAlignment(Pos.CENTER_LEFT);
+
+        Button backBtn = new Button("← Back to Arena");
         GamerVaultStyles.applyGhostButton(backBtn);
         backBtn.setOnAction(e -> {
             roomController.stopListening();
@@ -53,11 +66,77 @@ public class ActiveBattleRoomScreen {
             mainScreen.updateCenter();
         });
 
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button reportBtn = new Button("🚨 Report Issue");
+        reportBtn.setStyle(
+                "-fx-background-color: rgba(239, 68, 68, 0.1); -fx-text-fill: #EF4444; -fx-border-color: rgba(239, 68, 68, 0.3); -fx-border-radius: 6; -fx-cursor: hand;");
+        reportBtn.setOnAction(e -> {
+            Dialog<ButtonType> reportDialog = new Dialog<>();
+            reportDialog.setTitle("Report Match Issue");
+
+            VBox formRoot = new VBox(15);
+            formRoot.setPadding(new Insets(20));
+            formRoot.setStyle(
+                    "-fx-background-color: #0B0F19; -fx-border-color: #EF4444; -fx-border-width: 1; -fx-border-radius: 8;");
+
+            Text headerTxt = new Text("What is the issue?");
+            headerTxt.setFill(Color.WHITE);
+            headerTxt.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+
+            ComboBox<String> issueType = new ComboBox<>();
+            issueType.getItems().addAll(
+                    "Opponent Uploaded Fake Evidence",
+                    "Opponent Used Hacks/Cheats",
+                    "Opponent Refusing to Start Match",
+                    "Toxic Behavior / Harassment",
+                    "Other");
+            issueType.setPromptText("Select a reason...");
+            issueType.setStyle(
+                    "-fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: white; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 6;");
+            issueType.setPrefWidth(300);
+
+            TextArea detailArea = new TextArea();
+            detailArea.setPromptText("Provide specific details for the admin review...");
+            detailArea.setPrefRowCount(4);
+            detailArea.setStyle("-fx-control-inner-background: #111827; -fx-text-fill: white;");
+
+            formRoot.getChildren().addAll(headerTxt, issueType, detailArea);
+            reportDialog.getDialogPane().setContent(formRoot);
+            reportDialog.getDialogPane().getButtonTypes().addAll(ButtonType.APPLY,
+                    ButtonType.CANCEL);
+            reportDialog.getDialogPane().setStyle("-fx-background-color: #0B0F19;");
+
+            // Style buttons
+            Node submitBtnNode = reportDialog.getDialogPane().lookupButton(ButtonType.APPLY);
+            if (submitBtnNode instanceof Button) {
+                ((Button) submitBtnNode).setText("Submit Report");
+                ((Button) submitBtnNode)
+                        .setStyle("-fx-background-color: #EF4444; -fx-text-fill: white; -fx-font-weight: bold;");
+            }
+            Node cancelBtnNode = reportDialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+            if (cancelBtnNode instanceof Button)
+                GamerVaultStyles.applyGhostButton((Button) cancelBtnNode);
+
+            reportDialog.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.APPLY) {
+                    new Thread(() -> {
+                        // In Phase 2: Save to a "Disputes" collection. For now, freeze the room.
+                        BattleDao.updateBattleStatus(currentBattleId,
+                                BattleFirebaseKeys.STATUS_DISPUTED);
+                    }).start();
+                }
+            });
+        });
+
+        topNav.getChildren().addAll(backBtn, spacer, reportBtn);
+
         mainContainer = new VBox(20);
         mainContainer.setPadding(new Insets(20, 40, 40, 40));
         mainContainer.setAlignment(Pos.TOP_CENTER);
 
-        mainContainer.getChildren().add(backBtn);
+        mainContainer.getChildren().add(topNav); // Add the new Top Nav
 
         root.setCenter(mainContainer);
 
@@ -72,6 +151,16 @@ public class ActiveBattleRoomScreen {
      */
     private void updateUI(BattleModel battle) {
         Platform.runLater(() -> {
+
+            boolean isActiveMatch = battle.getStatus().equals(BattleFirebaseKeys.STATUS_LOCKED) ||
+                    battle.getStatus().equals(BattleFirebaseKeys.STATUS_IN_PROGRESS);
+
+            long startTime = battle.getLockedAt() > 0 ? battle.getLockedAt() : battle.getCreatedAt();
+            if (isActiveMatch && System.currentTimeMillis() > startTime + (45 * 60 * 1000)) {
+                new Thread(() -> BattleRoomController.evaluateRound(battle, 0)).start();
+                return; // Let the screen refresh on the next snapshot once evaluated
+            }
+
             // Clear old UI (except the back button)
             if (mainContainer.getChildren().size() > 1) {
                 mainContainer.getChildren().remove(1, mainContainer.getChildren().size());
@@ -242,8 +331,7 @@ public class ActiveBattleRoomScreen {
         desk.setAlignment(Pos.CENTER);
         desk.setPadding(new Insets(20));
 
-        // Hide evidence desk if the match hasn't even started yet
-        if (battle.getStatus().equals(BattleFirebaseKeys.STATUS_OPEN)) {
+        if (battle.getStatus().equals(BattleFirebaseKeys.STATUS_OPEN) || battle.getStatus().equals("DRAFT")) {
             desk.setVisible(false);
             return desk;
         }
@@ -252,11 +340,33 @@ public class ActiveBattleRoomScreen {
         title.setFill(Color.WHITE);
         title.setFont(Font.font("Arial", FontWeight.BOLD, 22));
 
+        // IF CAUGHT IN FRAUD / DISPUTE
+        if (battle.getStatus().equals(BattleFirebaseKeys.STATUS_DISPUTED)) {
+            VBox disputeBox = new VBox(10);
+            disputeBox.setAlignment(Pos.CENTER);
+            disputeBox.setPadding(new Insets(20));
+            disputeBox.setStyle(
+                    "-fx-background-color: rgba(239, 68, 68, 0.1); -fx-border-color: #EF4444; -fx-border-width: 2; -fx-border-radius: 12; -fx-background-radius: 12;");
+
+            Text dTitle = new Text("🚨 MATCH DISPUTED");
+            dTitle.setFill(Color.web("#EF4444"));
+            dTitle.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+
+            Text dSub = new Text(
+                    "Conflicting evidence detected. An admin is currently reviewing the uploaded screenshots.");
+            dSub.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+
+            disputeBox.getChildren().addAll(dTitle, dSub);
+            desk.getChildren().addAll(title, disputeBox);
+            return desk;
+        }
+
         HBox roundBox = new HBox(20);
         roundBox.setAlignment(Pos.CENTER);
 
-        // Example: If BO1, show 1 upload box. If BO3, show 3.
         int totalRounds = battle.getFormat().equals("BO3") ? 3 : 1;
+        String currentUserId = AuthController.currentUser.getUserId();
+        String myTeamSide = battle.getParticipants().get(currentUserId);
 
         for (int i = 1; i <= totalRounds; i++) {
             final int roundNum = i;
@@ -277,15 +387,28 @@ public class ActiveBattleRoomScreen {
             lossBtn.setStyle(
                     "-fx-background-color: rgba(239, 68, 68, 0.2); -fx-text-fill: #EF4444; -fx-border-color: #EF4444; -fx-border-radius: 6; -fx-cursor: hand;");
 
-            // Example Action: Opens file picker and calls Controller
-            winBtn.setOnAction(e -> {
-                winBtn.setText("Analyzing...");
-                // Note: Implement FileChooser here as done in UploadMatchScreen
-                // roomController.submitRoundEvidence(battle, roundNum, "A", "WIN", file,
-                // success -> { ... });
-            });
+            // Check if this user already uploaded for this round
+            RoundModel currentRound = battle.getRounds().size() >= i
+                    ? battle.getRounds().get(i - 1)
+                    : null;
+            boolean alreadySubmitted = false;
+            if (currentRound != null) {
+                if (myTeamSide.equals("A") && currentRound.getTeamAClaimedOutcome() != null)
+                    alreadySubmitted = true;
+                if (myTeamSide.equals("B") && currentRound.getTeamBClaimedOutcome() != null)
+                    alreadySubmitted = true;
+            }
 
-            uploadBox.getChildren().addAll(rLbl, winBtn, lossBtn);
+            if (alreadySubmitted) {
+                Text submittedTxt = new Text("Evidence Submitted ✓");
+                submittedTxt.setFill(Color.web(GamerVaultStyles.ACCENT_CYAN));
+                uploadBox.getChildren().addAll(rLbl, submittedTxt);
+            } else {
+                winBtn.setOnAction(e -> handleEvidenceUpload(winBtn, battle, roundNum, myTeamSide, "WIN"));
+                lossBtn.setOnAction(e -> handleEvidenceUpload(lossBtn, battle, roundNum, myTeamSide, "LOSS"));
+                uploadBox.getChildren().addAll(rLbl, winBtn, lossBtn);
+            }
+
             roundBox.getChildren().add(uploadBox);
         }
 
@@ -313,5 +436,26 @@ public class ActiveBattleRoomScreen {
             default:
                 return "#9CA3AF";
         }
+    }
+
+    private void handleEvidenceUpload(Button btn, BattleModel battle, int roundNum, String teamSide,
+            String claimedOutcome) {
+        FileChooser chooser = new FileChooser();
+        chooser.getExtensionFilters()
+                .add(new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg"));
+        File file = chooser.showOpenDialog(btn.getScene().getWindow());
+
+        if (file == null)
+            return;
+
+        btn.setDisable(true);
+        btn.setText("Analyzing...");
+
+        roomController.submitRoundEvidence(battle, roundNum, teamSide, claimedOutcome, file, success -> {
+            Platform.runLater(() -> {
+                btn.setText(success ? "Submitted ✓" : "Failed — retry");
+                btn.setDisable(success); // Keep disabled if successful
+            });
+        });
     }
 }

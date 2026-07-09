@@ -309,4 +309,168 @@ public class GeminiVisionController {
         model.addWarning(warning);
         return model;
     }
+
+    // ==========================================
+    // LIGHTWEIGHT TDM BATTLE VERIFICATION
+    // ==========================================
+
+    public static class BattleResultExtraction {
+        public String winnerSide; // "A", "B", or "UNCLEAR"
+        public double confidence;
+    }
+
+    // public static BattleResultExtraction extractBattleWinner(File screenshot,
+    // String gameTitle) {
+    // BattleResultExtraction result = new BattleResultExtraction();
+    // try {
+    // String prompt = "This is a BGMI team deathmatch result screen. Look at the
+    // top center of the image. " +
+    // "If you see the word 'VICTORY' in large gold/yellow text, the perspective
+    // player won. " +
+    // "If you see the word 'DEFEAT' in large red text, the perspective player lost.
+    // " +
+    // "Respond ONLY with a JSON object exactly like this: {\"winnerSide\": \"A\",
+    // \"confidence\": 0.99}. "
+    // +
+    // "Use 'A' if the perspective player won, 'B' if the perspective player lost,
+    // or 'UNCLEAR' if the text is missing.";
+
+    // // Call the lightweight helper method below
+    // String jsonResponse = analyzeBattleScreenshot(screenshot, prompt);
+
+    // // Parse the response
+    // if (jsonResponse.contains("\"winnerSide\": \"A\"") ||
+    // jsonResponse.contains("\"winnerSide\":\"A\"")) {
+    // result.winnerSide = "A";
+    // } else if (jsonResponse.contains("\"winnerSide\": \"B\"")
+    // || jsonResponse.contains("\"winnerSide\":\"B\"")) {
+    // result.winnerSide = "B";
+    // } else {
+    // result.winnerSide = "UNCLEAR";
+    // }
+
+    // result.confidence = 0.90; // Defaulting confidence for MVP
+    // return result;
+
+    // } catch (Exception e) {
+    // e.printStackTrace();
+    // result.winnerSide = "UNCLEAR";
+    // return result;
+    // }
+    // }
+
+    public static BattleResultExtraction extractBattleWinner(File screenshot, String gameTitle) {
+        BattleResultExtraction result = new BattleResultExtraction();
+        try {
+            String prompt = "";
+
+            // DYNAMIC PROMPTS BASED ON GAME TITLE
+            switch (gameTitle != null ? gameTitle.toUpperCase() : "BGMI") {
+                case "VALORANT":
+                    prompt = "This is a Valorant match result screen. Look for the 'MATCH WON' or 'MATCH LOST' text, " +
+                            "or check the final scoreboard team colors (Blue vs Red). " +
+                            "If the perspective player's team won, respond with {\"winnerSide\": \"A\", \"confidence\": 0.99}. "
+                            +
+                            "If they lost, use 'B'. Use 'UNCLEAR' if missing.";
+                    break;
+                case "FREE_FIRE":
+                    prompt = "This is a Free Fire match result screen (Booyah screen). Look for the 'BOOYAH' or 'DEFEAT' text. "
+                            +
+                            "If the perspective player's team won (Booyah), respond with {\"winnerSide\": \"A\", \"confidence\": 0.99}. "
+                            +
+                            "If they lost, use 'B'. Use 'UNCLEAR' if missing.";
+                    break;
+                case "BGMI":
+                default:
+                    prompt = "This is a BGMI team deathmatch result screen. Look at the top center of the image. " +
+                            "If you see the word 'VICTORY' in large gold/yellow text, the perspective player won. " +
+                            "If you see the word 'DEFEAT' in large red text, the perspective player lost. " +
+                            "Respond ONLY with a JSON object exactly like this: {\"winnerSide\": \"A\", \"confidence\": 0.99}. "
+                            +
+                            "Use 'A' if the perspective player won, 'B' if the perspective player lost, or 'UNCLEAR' if the text is missing.";
+                    break;
+            }
+
+            // Call the lightweight helper method
+            String jsonResponse = analyzeBattleScreenshot(screenshot, prompt);
+
+            // Parse the response
+            if (jsonResponse.contains("\"winnerSide\": \"A\"") || jsonResponse.contains("\"winnerSide\":\"A\"")) {
+                result.winnerSide = "A";
+            } else if (jsonResponse.contains("\"winnerSide\": \"B\"")
+                    || jsonResponse.contains("\"winnerSide\":\"B\"")) {
+                result.winnerSide = "B";
+            } else {
+                result.winnerSide = "UNCLEAR";
+            }
+
+            result.confidence = 0.90;
+            return result;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.winnerSide = "UNCLEAR";
+            return result;
+        }
+    }
+
+    // Helper method to make the HTTP call specifically for short prompts
+    private static String analyzeBattleScreenshot(File screenshot, String promptText) throws Exception {
+        java.net.URL url = new java.net.URL(API_URL);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setDoOutput(true);
+
+        JSONObject requestBody = new JSONObject();
+        JSONArray contents = new JSONArray();
+        JSONObject contentObject = new JSONObject();
+        contentObject.put("role", "user");
+
+        JSONArray partsArray = new JSONArray();
+
+        JSONObject textPart = new JSONObject();
+        textPart.put("text", promptText);
+        partsArray.put(textPart);
+
+        byte[] fileContent = java.nio.file.Files.readAllBytes(screenshot.toPath());
+        String base64Image = java.util.Base64.getEncoder().encodeToString(fileContent);
+
+        JSONObject inlineData = new JSONObject();
+        inlineData.put("mimeType", getMimeType(screenshot)); // Reuses your existing getMimeType helper
+        inlineData.put("data", base64Image);
+
+        JSONObject imagePart = new JSONObject();
+        imagePart.put("inlineData", inlineData);
+        partsArray.put(imagePart);
+
+        contentObject.put("parts", partsArray);
+        contents.put(contentObject);
+        requestBody.put("contents", contents);
+
+        JSONObject generationConfig = new JSONObject();
+        generationConfig.put("responseMimeType", "application/json");
+        requestBody.put("generationConfig", generationConfig);
+
+        try (java.io.OutputStream os = conn.getOutputStream()) {
+            byte[] input = requestBody.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+        }
+
+        if (conn.getResponseCode() == java.net.HttpURLConnection.HTTP_OK) {
+            StringBuilder response = new StringBuilder();
+            try (java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null)
+                    response.append(line);
+            }
+
+            JSONObject jsonResponse = new JSONObject(response.toString());
+            return jsonResponse.getJSONArray("candidates").getJSONObject(0).getJSONObject("content")
+                    .getJSONArray("parts").getJSONObject(0).getString("text");
+        } else {
+            throw new Exception("API Error: " + conn.getResponseCode());
+        }
+    }
 }

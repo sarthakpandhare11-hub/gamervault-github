@@ -109,6 +109,8 @@ public class PlayerMainScreen {
                     return new BattleArenaScreen().startBattleArenaScreen(this);
                 }
                 return new ActiveBattleRoomScreen().startBattleRoomScreen(this, activeBattleId);
+            case "versusHistory":
+                return new VersusHistoryScreen().startVersusHistoryScreen();
             case "recruitmentHub":
                 return new RecruitmentHubScreen().startRecruitmentHubScreen();
             case "scoutsInbox":

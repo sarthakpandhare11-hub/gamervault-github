@@ -103,4 +103,25 @@ public class StorageDao {
             return null;
         }
     }
+
+    public static String uploadBattleEvidence(java.io.File imageFile, String battleId, int roundNumber, String teamSide)
+            throws Exception {
+        String safeName = imageFile.getName().replaceAll("[^a-zA-Z0-9.-]", "");
+        String objectName = "battles/" + battleId + "/round" + roundNumber + "/" + teamSide + "-"
+                + System.currentTimeMillis() + "-" + safeName;
+        Bucket bucket = StorageClient.getInstance().bucket(BUCKET_NAME);
+        if (bucket == null) {
+            System.err.println("Error: Firebase Storage Bucket is not initialized.");
+            return null;
+        }
+
+        Blob blob = bucket.create(objectName,
+                Files.readAllBytes(imageFile.toPath()), "image/jpeg");
+
+        // Return the public download URL
+        return "https://firebasestorage.googleapis.com/v0/b/" + bucket.getName()
+                + "/o/" + URLEncoder.encode(blob.getName(), StandardCharsets.UTF_8)
+                        .replace("+", "%20")
+                + "?alt=media";
+    }
 }

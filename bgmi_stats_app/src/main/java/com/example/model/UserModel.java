@@ -37,6 +37,8 @@ public class UserModel {
     private String createdAt;
     private String updatedAt;
 
+    private double coinBalance = 500.0; // Give new users 500 coins to test with
+
     // GETTER AND SETTERS FOR THE USER MODEL
 
     // GETTERS AND SETTERS
@@ -217,4 +219,11 @@ public class UserModel {
         this.updatedAt = updatedAt;
     }
 
+    public double getCoinBalance() {
+        return coinBalance;
+    }
+
+    public void setCoinBalance(double coinBalance) {
+        this.coinBalance = coinBalance;
+    }
 }

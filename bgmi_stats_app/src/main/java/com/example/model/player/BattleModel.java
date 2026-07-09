@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 public class BattleModel {
+    private String gameTitle; // "BGMI", "VALORANT", "FREE_FIRE"
+
     private String battleId;
     private String hostType; // "PLAYER" or "ADMIN"
     private String hostUserId;
@@ -28,11 +30,23 @@ public class BattleModel {
     private String overallWinner; // "A" or "B"
 
     private long createdAt;
+    private long lockedAt;
+
+    private java.util.List<String> participantIds;
 
     public BattleModel() {
     }
 
     // GETTERS AND SETTERS
+
+    public String getGameTitle() {
+        return gameTitle;
+    }
+
+    public void setGameTitle(String gameTitle) {
+        this.gameTitle = gameTitle;
+    }
+
     public String getBattleId() {
         return battleId;
     }
@@ -151,5 +165,21 @@ public class BattleModel {
 
     public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public long getLockedAt() {
+        return lockedAt;
+    }
+
+    public void setLockedAt(long lockedAt) {
+        this.lockedAt = lockedAt;
+    }
+
+    public List<String> getParticipantIds() {
+        return participantIds;
+    }
+
+    public void setParticipantIds(List<String> participantIds) {
+        this.participantIds = participantIds;
     }
 }

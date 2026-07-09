@@ -123,6 +123,13 @@ public class PlayerDashboardSidebar {
             mainScreen.updateCenter();
         });
 
+        Button versusHistoryBtn = new Button("🛡 Versus History");
+        applyStyling(versusHistoryBtn, pageView.equals("versusHistory"));
+        versusHistoryBtn.setOnAction(event -> {
+            pageView = "versusHistory";
+            mainScreen.updateCenter();
+        });
+
         Button recruitmentHubButton = new Button("🤝  Recruitment Hub");
         applyStyling(recruitmentHubButton, pageView.equals("recruitmentHub"));
         recruitmentHubButton.setOnAction(event -> {
@@ -163,6 +170,7 @@ public class PlayerDashboardSidebar {
                 portfolioGeneratorButton,
                 leaderboardButton,
                 battleArenaBtn,
+                versusHistoryBtn,
                 recruitmentHubButton,
                 inboxBtn,
                 profileButton);

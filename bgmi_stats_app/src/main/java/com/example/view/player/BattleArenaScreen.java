@@ -128,21 +128,44 @@ public class BattleArenaScreen {
     }
 
     // --- 2. CONTROLS ---
+    private Button globalTabBtn;
+    private Button activeTabBtn;
+    private String activeArenaTab = "GLOBAL";
+
     private HBox createControlsRow() {
         HBox controls = new HBox(15);
         controls.setAlignment(Pos.CENTER_LEFT);
 
-        // Filters
-        modeFilter = createStyledDropdown("Mode: All", "1V1", "2V2", "4V4");
-        formatFilter = createStyledDropdown("Format: All", "BO1", "BO3");
+        // Segmented Toggle Switch
+        HBox toggleBox = new HBox();
+        toggleBox.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 8; -fx-padding: 4;");
 
-        modeFilter.setOnAction(e -> filterLobbies());
-        formatFilter.setOnAction(e -> filterLobbies());
+        globalTabBtn = new Button("🌍 Global Arena");
+        activeTabBtn = new Button("⚔ My Active Wagers");
+
+        for (Button b : new Button[] { globalTabBtn, activeTabBtn }) {
+            b.setPrefHeight(38);
+            b.setPrefWidth(160);
+            b.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+            b.setStyle("-fx-background-color: transparent; -fx-text-fill: #9CA3AF; -fx-cursor: hand;");
+        }
+
+        globalTabBtn.setOnAction(e -> {
+            activeArenaTab = "GLOBAL";
+            updateTabStyles();
+            filterLobbies();
+        });
+        activeTabBtn.setOnAction(e -> {
+            activeArenaTab = "ACTIVE";
+            updateTabStyles();
+            filterLobbies();
+        });
+        toggleBox.getChildren().addAll(globalTabBtn, activeTabBtn);
+        updateTabStyles();
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Host Button
         Button hostBtn = new Button("+ Host New Battle");
         hostBtn.setPrefHeight(40);
         hostBtn.setPadding(new Insets(0, 20, 0, 20));
@@ -150,8 +173,15 @@ public class BattleArenaScreen {
                 GamerVaultStyles.ACCENT_PURPLE_DARK, "white");
         hostBtn.setOnAction(e -> openHostBattleDialog());
 
-        controls.getChildren().addAll(modeFilter, formatFilter, spacer, hostBtn);
+        controls.getChildren().addAll(toggleBox, spacer, hostBtn);
         return controls;
+    }
+
+    private void updateTabStyles() {
+        String activeStyle = "-fx-background-color: rgba(14, 165, 233, 0.2); -fx-text-fill: white; -fx-background-radius: 6; -fx-cursor: hand; -fx-border-color: #0EA5E9; -fx-border-radius: 6;";
+        String inactiveStyle = "-fx-background-color: transparent; -fx-text-fill: #9CA3AF; -fx-cursor: hand;";
+        globalTabBtn.setStyle("GLOBAL".equals(activeArenaTab) ? activeStyle : inactiveStyle);
+        activeTabBtn.setStyle("ACTIVE".equals(activeArenaTab) ? activeStyle : inactiveStyle);
     }
 
     // --- 3. FEATURED (ADMIN) SECTION ---
@@ -162,6 +192,7 @@ public class BattleArenaScreen {
         header.setAlignment(Pos.CENTER_LEFT);
         Text icon = new Text("⭐");
         icon.setFill(Color.web(GamerVaultStyles.ACCENT_PURPLE_LIGHT));
+
         Text title = new Text("Featured Cash Clashes");
         title.setFill(Color.WHITE);
         title.setFont(Font.font("Arial", FontWeight.BOLD, 18));
@@ -210,14 +241,12 @@ public class BattleArenaScreen {
     // --- DATA LOADING & FILTERING ---
     private void loadBattles() {
         playerLobbiesGrid.getChildren().clear();
-        featuredAdminBox.getChildren().clear();
-
         Text loading = new Text("Scanning Arena Servers...");
         loading.setFill(Color.web(GamerVaultStyles.ACCENT_PURPLE));
         playerLobbiesGrid.getChildren().add(loading);
 
         new Thread(() -> {
-            allOpenBattles = BattleController.getOpenLobbies();
+            allOpenBattles = com.example.dao.BattleDao.getAllActiveBattles(); // Use the new method
             Platform.runLater(this::filterLobbies);
         }).start();
     }
@@ -226,31 +255,30 @@ public class BattleArenaScreen {
         if (allOpenBattles == null)
             return;
         playerLobbiesGrid.getChildren().clear();
-        featuredAdminBox.getChildren().clear();
-
-        String selectedMode = modeFilter.getValue();
-        String selectedFormat = formatFilter.getValue();
+        String myUserId = AuthController.currentUser != null ? AuthController.currentUser.getUserId() : "";
 
         int delay = 0;
         for (BattleModel battle : allOpenBattles) {
-            // Apply Filters
-            if (selectedMode != null && !selectedMode.contains("All") && !battle.getMode().equals(selectedMode))
-                continue;
-            if (selectedFormat != null && !selectedFormat.contains("All") && !battle.getFormat().equals(selectedFormat))
-                continue;
+            boolean isParticipant = battle.getParticipants() != null && battle.getParticipants().containsKey(myUserId);
 
-            if ("ADMIN".equals(battle.getHostType())) {
-                // Future expansion: Render Wide Admin Card here
-            } else {
-                StackPane card = createPlayerLobbyCard(battle);
-                playerLobbiesGrid.getChildren().add(card);
-                GamerVaultAnimations.fadeInUp(card, delay * 50, 400);
-                delay++;
+            // TAB FILTERING LOGIC
+            if (activeArenaTab.equals("GLOBAL")
+                    && (!battle.getStatus().equals(BattleFirebaseKeys.STATUS_OPEN) || isParticipant)) {
+                continue; // Hide active/my games from the global discovery feed
             }
+            if (activeArenaTab.equals("ACTIVE") && !isParticipant) {
+                continue; // Hide games I'm not in from the active feed
+            }
+
+            StackPane card = createPlayerLobbyCard(battle);
+            playerLobbiesGrid.getChildren().add(card);
+            GamerVaultAnimations.fadeInUp(card, delay * 50, 400);
+            delay++;
         }
 
         if (playerLobbiesGrid.getChildren().isEmpty()) {
-            Text empty = new Text("No active wagers match your filters.");
+            Text empty = new Text(
+                    activeArenaTab.equals("ACTIVE") ? "You have no active wagers." : "No open wagers available.");
             empty.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
             playerLobbiesGrid.getChildren().add(empty);
         }
@@ -401,13 +429,24 @@ public class BattleArenaScreen {
         boolean alreadyJoined = AuthController.currentUser != null
                 && battle.getParticipants().containsKey(AuthController.currentUser.getUserId());
 
-        if (isFull || alreadyJoined) {
-            joinBtn.setText(alreadyJoined ? "Already Joined" : "Lobby Full");
+        if (alreadyJoined) {
+            joinBtn.setText("Return to Lobby");
+            GamerVaultStyles.applyGhostButton(joinBtn);
+            joinBtn.setStyle(joinBtn.getStyle() + "-fx-border-color: " + GamerVaultStyles.ACCENT_CYAN
+                    + "; -fx-text-fill: white;");
+
+            joinBtn.setOnAction(e -> {
+                mainScreen.activeBattleId = battle.getBattleId();
+                PlayerDashboardSidebar.pageView = "activeBattleRoom";
+                mainScreen.updateCenter();
+            });
+        } else if (isFull) {
+            joinBtn.setText("Lobby Full");
             joinBtn.setStyle(
                     "-fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: #6B7280; -fx-background-radius: 8;");
             joinBtn.setDisable(true);
         } else {
-            joinBtn.setText("Join Lobby (" + String.format("%.0f", battle.getEntryFeeCoins()) + " 🪙)");
+            joinBtn.setText("Join Lobby (" + String.format("%.0f", battle.getEntryFeeCoins()) + " \uD83E\uDE99)");
             GamerVaultStyles.applyGhostButton(joinBtn);
             joinBtn.setStyle(joinBtn.getStyle() + "-fx-border-color: " + GamerVaultStyles.ACCENT_PURPLE
                     + "; -fx-text-fill: white;");
@@ -416,10 +455,9 @@ public class BattleArenaScreen {
                 joinBtn.setText("Joining...");
                 joinBtn.setDisable(true);
                 new Thread(() -> {
-                    boolean success = BattleController.joinBattle(battle);
+                    boolean success = BattleController.joinBattle(battle.getBattleId());
                     Platform.runLater(() -> {
                         if (success) {
-                            // Route to the Active Room
                             mainScreen.activeBattleId = battle.getBattleId();
                             PlayerDashboardSidebar.pageView = "activeBattleRoom";
                             mainScreen.updateCenter();
@@ -453,6 +491,10 @@ public class BattleArenaScreen {
         title.setFill(Color.WHITE);
         title.setFont(Font.font("Arial", FontWeight.BOLD, 20));
 
+        ComboBox<String> gameBox = createStyledDropdown("Select Game", "BGMI");
+        gameBox.setValue("BGMI");
+        gameBox.setPrefWidth(350);
+
         ComboBox<String> modeBox = createStyledDropdown("Select Mode", "1V1", "2V2", "4V4");
         modeBox.setValue("1V1");
         modeBox.setPrefWidth(350);
@@ -470,7 +512,16 @@ public class BattleArenaScreen {
         feeInput.setPrefHeight(45);
         feeWrapper.getChildren().addAll(feeLbl, feeInput);
 
-        root.getChildren().addAll(title, modeBox, formatBox, feeWrapper);
+        VBox sideWrapper = new VBox(5);
+        Text sideLbl = new Text("Select Your Side");
+        sideLbl.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
+        sideLbl.setFont(Font.font("Arial", 12));
+        ComboBox<String> sideBox = createStyledDropdown("Select Side", "Team A (Blue)", "Team B (Red)");
+        sideBox.setValue("Team A (Blue)");
+        sideBox.setPrefWidth(350);
+        sideWrapper.getChildren().addAll(sideLbl, sideBox);
+
+        root.getChildren().addAll(title, gameBox, modeBox, formatBox, feeWrapper, sideWrapper);
 
         dialog.getDialogPane().setContent(root);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -494,15 +545,16 @@ public class BattleArenaScreen {
                     String format = formatBox.getValue();
 
                     new Thread(() -> {
-                        String newBattleId = BattleController.hostBattle(mode, format, fee);
+                        String rawSide = sideBox.getValue().contains("A") ? "A" : "B";
+                        String selectedGame = gameBox.getValue();
+
+                        // Pass selectedGame as the first parameter
+                        String newBattleId = BattleController.hostBattle(selectedGame, mode, format, fee, rawSide);
                         Platform.runLater(() -> {
                             if (newBattleId != null) {
-                                // Route to the Active Room
                                 mainScreen.activeBattleId = newBattleId;
                                 PlayerDashboardSidebar.pageView = "activeBattleRoom";
                                 mainScreen.updateCenter();
-                            } else {
-                                // Handle error (e.g., show an Alert)
                             }
                         });
                     }).start();
