@@ -1,2 +1,5 @@
 # Firebase service-account credentials (keep local; never commit)
 **/serviceAccountKey.json
+
+# Local app configuration (keep secrets/settings out of Git)
+/bgmi_stats_app/config.properties
