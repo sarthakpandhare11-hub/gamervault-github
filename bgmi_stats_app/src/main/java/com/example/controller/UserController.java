@@ -15,7 +15,8 @@ public class UserController {
 
             db.collection(UserFirebaseKeys.USERS_COLLECTION)
                     .document(user.getUserId())
-                    .set(user);
+                    .set(user)
+                    .get();
 
             return true;
         } catch (Exception e) {

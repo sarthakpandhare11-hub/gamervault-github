@@ -96,7 +96,7 @@ public class AdminDisputeScreen {
         card.getChildren().add(battleTitle);
 
         for (RoundModel round : battle.getRounds()) {
-            if (!BattleFirebaseKeys.STATUS_DISPUTED.equals(round.getRoundStatus()))
+            if (round.getTeamAScreenshotUrl() == null && round.getTeamBScreenshotUrl() == null)
                 continue;
 
             HBox comparisonBox = new HBox(30);

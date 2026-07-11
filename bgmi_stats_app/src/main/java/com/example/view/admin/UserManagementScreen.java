@@ -380,34 +380,77 @@ public class UserManagementScreen {
             Button banBtn = new Button("🚫");
             Button delBtn = new Button("🗑");
 
+            // VIEW ACTION: Show a quick popup of the user's details
             viewBtn.setOnAction(e -> {
-                System.out.println("Viewing profile for: " + userObj.getEmail());
-                // TODO: Implement
+                Alert info = new Alert(Alert.AlertType.INFORMATION);
+                info.setTitle("User Profile");
+                info.setHeaderText("Player: " + player);
+                info.setContentText("Email: " + email + "\nRole: " + role + "\nJoined: " + date +
+                        "\nStatus: " + (userObj.isSuspended() ? "Suspended" : "Active") +
+                        "\nVerified: " + (userObj.isVerified() ? "Yes" : "No"));
+                info.showAndWait();
             });
 
+            // BAN/SUSPEND ACTION: Threaded database call
             banBtn.setOnAction(e -> {
+                boolean isCurrentlySuspended = userObj.isSuspended();
+                String actionStr = isCurrentlySuspended ? "Restore" : "Suspend";
+
                 Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                alert.setTitle("Suspend User");
-                alert.setHeaderText("Suspend " + player + "?");
-                alert.setContentText("This will prevent the user from logging in.");
+                alert.setTitle(actionStr + " User");
+                alert.setHeaderText(actionStr + " " + player + "?");
+                alert.setContentText(isCurrentlySuspended ? "This will allow the user to log in again."
+                        : "This will prevent the user from logging in.");
+
                 alert.showAndWait().ifPresent(res -> {
                     if (res == ButtonType.OK) {
-                        System.out.println("Suspending ID: " + userObj.getUserId());
-                        // TODO: Call AdminController.suspendUser(userObj.getUserId())
+                        banBtn.setDisable(true);
+                        new Thread(() -> {
+                            // Make sure AdminController.suspendUser is implemented as provided in the
+                            // previous step
+                            boolean success = AdminController.suspendUser(userObj.getUserId(), !isCurrentlySuspended);
+
+                            Platform.runLater(() -> {
+                                banBtn.setDisable(false);
+                                if (success) {
+                                    userObj.setSuspended(!isCurrentlySuspended);
+                                    // Refresh the table to reflect the new status badge visually
+                                    loadUsersData();
+                                } else {
+                                    new Alert(Alert.AlertType.ERROR, "Failed to update suspension status.").show();
+                                }
+                            });
+                        }).start();
                     }
                 });
             });
 
+            // DELETE ACTION: Threaded database call
             delBtn.setOnAction(e -> {
                 Alert alert = new Alert(Alert.AlertType.WARNING);
                 alert.setTitle("Delete User");
                 alert.setHeaderText("Permanently delete " + player + "?");
-                alert.setContentText(
-                        "This action cannot be undone. All match history and profile data will be erased.");
+                alert.setContentText("This action cannot be undone. All data will be erased.");
+
                 alert.showAndWait().ifPresent(res -> {
                     if (res == ButtonType.OK) {
-                        System.out.println("Deleting ID: " + userObj.getUserId());
-                        // TODO: Call AdminController.deleteUser(userObj.getUserId())
+                        delBtn.setDisable(true);
+                        new Thread(() -> {
+                            // Make sure AdminController.deleteUser is implemented as provided in the
+                            // previous step
+                            boolean success = AdminController.deleteUser(userObj.getUserId());
+
+                            Platform.runLater(() -> {
+                                if (success) {
+                                    // Remove the user from the UI lists dynamically
+                                    tableContainer.getChildren().remove(row);
+                                    allFetchedUsers.remove(userObj);
+                                } else {
+                                    delBtn.setDisable(false);
+                                    new Alert(Alert.AlertType.ERROR, "Failed to delete user.").show();
+                                }
+                            });
+                        }).start();
                     }
                 });
             });

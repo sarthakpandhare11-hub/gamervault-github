@@ -39,6 +39,8 @@ public class UserModel {
 
     private double coinBalance = 500.0; // Give new users 500 coins to test with
 
+    private boolean suspended = false;
+
     // GETTER AND SETTERS FOR THE USER MODEL
 
     // GETTERS AND SETTERS
@@ -225,5 +227,13 @@ public class UserModel {
 
     public void setCoinBalance(double coinBalance) {
         this.coinBalance = coinBalance;
+    }
+
+    public boolean isSuspended() {
+        return suspended;
+    }
+
+    public void setSuspended(boolean suspended) {
+        this.suspended = suspended;
     }
 }

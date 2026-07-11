@@ -7,6 +7,7 @@ import com.example.view.util.GamerVaultAnimations;
 import com.example.view.util.GamerVaultStyles;
 import com.example.view.util.SizedBox;
 
+import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -344,24 +345,46 @@ public class LoginScreen {
             String email = emailTextField.getText().trim().toLowerCase();
             String password = hiddenPassField.getText().trim();
 
-            String responseMessage = AuthController.handleLogin(email, password);
-            if (responseMessage.contains("successful")) {
-                errorMessageLabel.setText(responseMessage);
-                errorMessageLabel.setTextFill(Color.GREEN);
-                errorMessageLabel.setVisible(true);
-
-                if (AuthController.currentUser != null
-                        && "ADMIN".equalsIgnoreCase(AuthController.currentUser.getRole())) {
-                    navigateToAdminMainScreen();
-                } else {
-                    navigateToPlayerMainScreen();
-                }
-            } else {
-                errorMessageLabel.setText(responseMessage);
+            if (email.isEmpty() || password.isEmpty()) {
+                errorMessageLabel.setText("Please enter both email and password.");
                 errorMessageLabel.setTextFill(Color.RED);
                 errorMessageLabel.setVisible(true);
+                return;
             }
-            clearFields(emailTextField, hiddenPassField);
+
+            // 1. Disable button and show loading state
+            loginButton.setDisable(true);
+            loginButton.setText("AUTHENTICATING...");
+
+            // 2. Push network call to background thread
+            new Thread(() -> {
+                String responseMessage = AuthController.handleLogin(email, password);
+
+                // 3. Push UI updates back to the main JavaFX thread
+                Platform.runLater(() -> {
+                    if (responseMessage.contains("successful")) {
+                        errorMessageLabel.setText(responseMessage);
+                        errorMessageLabel.setTextFill(Color.GREEN);
+                        errorMessageLabel.setVisible(true);
+
+                        if (AuthController.currentUser != null
+                                && "ADMIN".equalsIgnoreCase(AuthController.currentUser.getRole())) {
+                            navigateToAdminMainScreen();
+                        } else {
+                            navigateToPlayerMainScreen();
+                        }
+                    } else {
+                        errorMessageLabel.setText(responseMessage);
+                        errorMessageLabel.setTextFill(Color.RED);
+                        errorMessageLabel.setVisible(true);
+                    }
+                    clearFields(emailTextField, hiddenPassField);
+
+                    // 4. Restore button state in case of failure
+                    loginButton.setDisable(false);
+                    loginButton.setText("EXECUTE LOGIN");
+                });
+            }).start();
         });
 
         // Divider

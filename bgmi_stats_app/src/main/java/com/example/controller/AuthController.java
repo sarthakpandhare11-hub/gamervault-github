@@ -96,6 +96,11 @@ public class AuthController {
             String userId = FirebaseAuthDao.loginWithEmailAndPassword(email, password);
 
             currentUser = UserController.getUserProfile(userId);
+            if (currentUser != null && currentUser.isSuspended()) {
+                currentUser = null; // Kick them out
+                return "ACCESS DENIED: This account has been suspended by an Admin.";
+            }
+
             if (currentUser != null) {
                 return "Login successful! ";
             } else {

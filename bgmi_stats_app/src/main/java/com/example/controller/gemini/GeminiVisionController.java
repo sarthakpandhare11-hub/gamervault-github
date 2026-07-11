@@ -16,10 +16,11 @@ import org.json.JSONObject;
 
 import com.example.model.player.DualMatchResultModel;
 import com.example.model.player.MatchExtractionResultModel;
+import com.example.view.util.ConfigManager;
 
 public class GeminiVisionController {
 
-    private static final String API_KEY = "AIzaSyCfaHXevra37pJAyyo7_B68K66AkgAzpeg";
+    private static final String API_KEY = ConfigManager.get("GEMINI_API_KEY");
     private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="
             + API_KEY;
 

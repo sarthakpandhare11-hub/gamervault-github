@@ -5,6 +5,7 @@ import com.example.view.util.GamerVaultAnimations;
 import com.example.view.util.GamerVaultStyles;
 import com.example.view.util.SizedBox;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -173,23 +174,34 @@ public class RegistrationScreen {
                         String password = passwordTextField.getText();
                         String confirmPassword = confirmPasswordTextField.getText();
 
-                        // CALL TO NEW REGISTER METHOD
-                        String errorMessage = AuthController.handleNewRegister(
-                                        email,
-                                        password,
-                                        confirmPassword,
-                                        userName);
+                        createAccButton.setDisable(true);
+                        createAccButton.setText("CREATING ACCOUNT...");
 
-                        if (errorMessage.contains("successfully")) {
-                                errorMessageLabel.setText(errorMessage);
-                                errorMessageLabel.setTextFill(Color.GREEN);
-                                errorMessageLabel.setVisible(true);
-                        } else {
-                                errorMessageLabel.setText(errorMessage);
-                                errorMessageLabel.setTextFill(Color.RED);
-                                errorMessageLabel.setVisible(true);
-                        }
-                        clearFields(userNameTextField, emailTextField, passwordTextField, confirmPasswordTextField);
+                        // CALL TO NEW REGISTER METHOD
+                        new Thread(() -> {
+                                String errorMessage = AuthController.handleNewRegister(
+                                                email,
+                                                password,
+                                                confirmPassword,
+                                                userName);
+
+                                Platform.runLater(() -> {
+                                        if (errorMessage.contains("successfully")) {
+                                                errorMessageLabel.setText(errorMessage);
+                                                errorMessageLabel.setTextFill(Color.GREEN);
+                                                errorMessageLabel.setVisible(true);
+                                        } else {
+                                                errorMessageLabel.setText(errorMessage);
+                                                errorMessageLabel.setTextFill(Color.RED);
+                                                errorMessageLabel.setVisible(true);
+                                        }
+                                        clearFields(userNameTextField, emailTextField, passwordTextField,
+                                                        confirmPasswordTextField);
+
+                                        createAccButton.setDisable(false);
+                                        createAccButton.setText("CREATE ACCOUNT");
+                                });
+                        }).start();
                 });
 
                 Text alreadyAccText = new Text("Already have an account?");

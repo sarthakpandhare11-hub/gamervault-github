@@ -311,4 +311,29 @@ public class BattleDao {
             return false;
         }
     }
+
+    /**
+     * Safely escalates a match to a dispute, updating both the battle and the
+     * round.
+     */
+    public static boolean escalateToDispute(String battleId, int roundIndex) {
+        com.google.cloud.firestore.Firestore db = com.google.firebase.cloud.FirestoreClient.getFirestore();
+        com.google.cloud.firestore.DocumentReference ref = db
+                .collection(com.example.keys.BattleFirebaseKeys.COLLECTION_BATTLES).document(battleId);
+        try {
+            return db.runTransaction(txn -> {
+                com.example.model.player.BattleModel b = txn.get(ref).get()
+                        .toObject(com.example.model.player.BattleModel.class);
+                if (b != null) {
+                    b.setStatus(com.example.keys.BattleFirebaseKeys.STATUS_DISPUTED);
+                    b.getRounds().get(roundIndex).setRoundStatus(com.example.keys.BattleFirebaseKeys.STATUS_DISPUTED);
+                    txn.set(ref, b);
+                }
+                return true;
+            }).get();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

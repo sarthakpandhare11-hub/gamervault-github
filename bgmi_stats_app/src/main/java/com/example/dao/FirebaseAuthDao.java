@@ -6,6 +6,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import org.json.JSONObject;
+
 public class FirebaseAuthDao {
     private static final String API_KEY = "AIzaSyDAI1H9FezWEubh-6Get-3WiEpNQx72VnM";
 
@@ -27,12 +29,19 @@ public class FirebaseAuthDao {
 
             connection.setDoOutput(true);
 
-            String payloadJson = String.format("{\"email\":\"%s\",\"password\":\"%s\", \"returnSecureToken\": true}",
-                    email, password);
+            // String payloadJson = String.format("{\"email\":\"%s\",\"password\":\"%s\",
+            // \"returnSecureToken\": true}",
+            // email, password);
+            JSONObject json = new JSONObject();
+            json.put("email", email);
+            json.put("password", password);
+            json.put("returnSecureToken", true);
+
+            String jsonPayload = json.toString();
 
             OutputStream os = connection.getOutputStream();
 
-            os.write(payloadJson.getBytes());
+            os.write(jsonPayload.getBytes());
 
             int responseCode = connection.getResponseCode();
 
@@ -79,11 +88,19 @@ public class FirebaseAuthDao {
 
             connection.setDoOutput(true);
 
-            String payloadJson = String.format("{\"email\":\"%s\",\"password\":\"%s\", \"returnSecureToken\": true}",
-                    email, password);
+            // String payloadJson = String.format("{\"email\":\"%s\",\"password\":\"%s\",
+            // \"returnSecureToken\": true}",
+            // email, password);
+
+            JSONObject json = new org.json.JSONObject();
+            json.put("email", email);
+            json.put("password", password);
+            json.put("returnSecureToken", true);
+
+            String jsonPayload = json.toString();
 
             OutputStream os = connection.getOutputStream();
-            os.write(payloadJson.getBytes());
+            os.write(jsonPayload.getBytes());
             os.flush();
             os.close();
 
