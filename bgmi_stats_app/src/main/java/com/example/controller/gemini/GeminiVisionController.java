@@ -14,6 +14,7 @@ import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import com.example.model.player.DualMatchResultModel;
 import com.example.model.player.MatchExtractionResultModel;
 
 public class GeminiVisionController {
@@ -319,46 +320,6 @@ public class GeminiVisionController {
         public double confidence;
     }
 
-    // public static BattleResultExtraction extractBattleWinner(File screenshot,
-    // String gameTitle) {
-    // BattleResultExtraction result = new BattleResultExtraction();
-    // try {
-    // String prompt = "This is a BGMI team deathmatch result screen. Look at the
-    // top center of the image. " +
-    // "If you see the word 'VICTORY' in large gold/yellow text, the perspective
-    // player won. " +
-    // "If you see the word 'DEFEAT' in large red text, the perspective player lost.
-    // " +
-    // "Respond ONLY with a JSON object exactly like this: {\"winnerSide\": \"A\",
-    // \"confidence\": 0.99}. "
-    // +
-    // "Use 'A' if the perspective player won, 'B' if the perspective player lost,
-    // or 'UNCLEAR' if the text is missing.";
-
-    // // Call the lightweight helper method below
-    // String jsonResponse = analyzeBattleScreenshot(screenshot, prompt);
-
-    // // Parse the response
-    // if (jsonResponse.contains("\"winnerSide\": \"A\"") ||
-    // jsonResponse.contains("\"winnerSide\":\"A\"")) {
-    // result.winnerSide = "A";
-    // } else if (jsonResponse.contains("\"winnerSide\": \"B\"")
-    // || jsonResponse.contains("\"winnerSide\":\"B\"")) {
-    // result.winnerSide = "B";
-    // } else {
-    // result.winnerSide = "UNCLEAR";
-    // }
-
-    // result.confidence = 0.90; // Defaulting confidence for MVP
-    // return result;
-
-    // } catch (Exception e) {
-    // e.printStackTrace();
-    // result.winnerSide = "UNCLEAR";
-    // return result;
-    // }
-    // }
-
     public static BattleResultExtraction extractBattleWinner(File screenshot, String gameTitle) {
         BattleResultExtraction result = new BattleResultExtraction();
         try {
@@ -416,8 +377,8 @@ public class GeminiVisionController {
 
     // Helper method to make the HTTP call specifically for short prompts
     private static String analyzeBattleScreenshot(File screenshot, String promptText) throws Exception {
-        java.net.URL url = new java.net.URL(API_URL);
-        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        URL url = new URL(API_URL);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
         conn.setDoOutput(true);
@@ -433,8 +394,8 @@ public class GeminiVisionController {
         textPart.put("text", promptText);
         partsArray.put(textPart);
 
-        byte[] fileContent = java.nio.file.Files.readAllBytes(screenshot.toPath());
-        String base64Image = java.util.Base64.getEncoder().encodeToString(fileContent);
+        byte[] fileContent = Files.readAllBytes(screenshot.toPath());
+        String base64Image = Base64.getEncoder().encodeToString(fileContent);
 
         JSONObject inlineData = new JSONObject();
         inlineData.put("mimeType", getMimeType(screenshot)); // Reuses your existing getMimeType helper
@@ -452,15 +413,15 @@ public class GeminiVisionController {
         generationConfig.put("responseMimeType", "application/json");
         requestBody.put("generationConfig", generationConfig);
 
-        try (java.io.OutputStream os = conn.getOutputStream()) {
-            byte[] input = requestBody.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try (OutputStream os = conn.getOutputStream()) {
+            byte[] input = requestBody.toString().getBytes(StandardCharsets.UTF_8);
             os.write(input, 0, input.length);
         }
 
-        if (conn.getResponseCode() == java.net.HttpURLConnection.HTTP_OK) {
+        if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
             StringBuilder response = new StringBuilder();
-            try (java.io.BufferedReader br = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null)
                     response.append(line);
@@ -471,6 +432,137 @@ public class GeminiVisionController {
                     .getJSONArray("parts").getJSONObject(0).getString("text");
         } else {
             throw new Exception("API Error: " + conn.getResponseCode());
+        }
+    }
+
+    /**
+     * Sends TWO images to Gemini simultaneously to cross-reference and verify the
+     * match.
+     */
+    public static DualMatchResultModel analyzeDualMatchImages(byte[] imageABytes, byte[] imageBBytes,
+            String gameTitle) {
+        DualMatchResultModel result = new DualMatchResultModel();
+
+        try {
+            String base64ImageA = Base64.getEncoder().encodeToString(imageABytes);
+            String base64ImageB = Base64.getEncoder().encodeToString(imageBBytes);
+
+            String gameContext = (gameTitle != null) ? gameTitle : "BGMI";
+
+            // The strict referee prompt mapped to the screenshot layout
+            String prompt = "You are an eSports referee verifying a " + gameContext + " match. " +
+                    "You are provided two screenshots. Image 1 is from Team A's perspective. Image 2 is from Team B's perspective. "
+                    +
+                    "1. Verify if both images are from the exact same match by cross-referencing final scores and IGNs. "
+                    +
+                    "2. Determine the winning team based ONLY on the perspective of Image 1 (Team A). " +
+                    "3. Extract the final score (top corners) and the MVP stats (Finishes, F/D, Assists) for both teams. "
+                    +
+                    "Respond ONLY with a valid JSON object matching this exact structure, nothing else: " +
+                    "{\"winnerSide\": \"A\", \"isSameMatch\": true, \"confidence\": 0.99, " +
+                    "\"teamA\": {\"score\": 23, \"mvpIgn\": \"CLUMSYog\", \"kills\": 23, \"fdRatio\": 1.5, \"assists\": 0}, "
+                    +
+                    "\"teamB\": {\"score\": 16, \"mvpIgn\": \"JORDJOHNNYxYT\", \"kills\": 16, \"fdRatio\": 0.7, \"assists\": 0}}";
+
+            // Assuming you have a standard HTTP client setup for Gemini in this class:
+            // Build the multi-part payload with BOTH images
+            String jsonPayload = "{" +
+                    "\"contents\": [{" +
+                    "\"parts\": [" +
+                    "{\"text\": \"" + prompt.replace("\"", "\\\"") + "\"}," +
+                    "{\"inline_data\": {\"mime_type\": \"image/jpeg\", \"data\": \"" + base64ImageA + "\"}}," +
+                    "{\"inline_data\": {\"mime_type\": \"image/jpeg\", \"data\": \"" + base64ImageB + "\"}}" +
+                    "]" +
+                    "}]" +
+                    "}";
+
+            // Make the HTTP POST request to the Gemini API
+            String jsonResponse = sendHttpRequestToGemini(jsonPayload); // Replace with your actual internal HTTP call
+                                                                        // method
+
+            // Safely parse the JSON response
+            if (jsonResponse.contains("\"winnerSide\": \"A\"") || jsonResponse.contains("\"winnerSide\":\"A\"")) {
+                result.winnerSide = "A";
+            } else if (jsonResponse.contains("\"winnerSide\": \"B\"")
+                    || jsonResponse.contains("\"winnerSide\":\"B\"")) {
+                result.winnerSide = "B";
+            } else {
+                result.winnerSide = "UNCLEAR";
+            }
+
+            result.isSameMatch = jsonResponse.contains("\"isSameMatch\": true")
+                    || jsonResponse.contains("\"isSameMatch\":true");
+
+            return result;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.winnerSide = "UNCLEAR";
+            result.isSameMatch = false;
+            return result;
+        }
+    }
+
+    private static String sendHttpRequestToGemini(String jsonPayload) throws Exception {
+        URL url = new URL(API_URL);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setDoOutput(true);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+        }
+
+        if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+            StringBuilder response = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null)
+                    response.append(line);
+            }
+            return response.toString();
+        } else {
+            throw new Exception("Gemini API Error: HTTP " + conn.getResponseCode());
+        }
+    }
+
+    /**
+     * Validates a single image when the opponent times out to prevent fake-upload
+     * forfeits.
+     */
+    public static String validateSingleMatchImage(byte[] imageBytes, String gameTitle) {
+        try {
+            String base64Image = java.util.Base64.getEncoder().encodeToString(imageBytes);
+            String gameContext = (gameTitle != null) ? gameTitle : "BGMI";
+
+            String prompt = "You are an eSports referee verifying a " + gameContext + " match forfeit claim. " +
+                    "Look at this single screenshot. Determine if it is a legitimate victory screen. " +
+                    "Respond ONLY with a JSON object: {\"winnerSide\": \"A\"} if the perspective player clearly won, " +
+                    "{\"winnerSide\": \"B\"} if they lost, or {\"winnerSide\": \"UNCLEAR\"} if invalid/unrelated.";
+
+            String jsonPayload = "{" +
+                    "\"contents\": [{" +
+                    "\"parts\": [" +
+                    "{\"text\": \"" + prompt.replace("\"", "\\\"") + "\"}," +
+                    "{\"inline_data\": {\"mime_type\": \"image/jpeg\", \"data\": \"" + base64Image + "\"}}" +
+                    "]" +
+                    "}]" +
+                    "}";
+
+            String jsonResponse = sendHttpRequestToGemini(jsonPayload);
+
+            if (jsonResponse.contains("\"winnerSide\": \"A\"") || jsonResponse.contains("\"winnerSide\":\"A\""))
+                return "A";
+            if (jsonResponse.contains("\"winnerSide\": \"B\"") || jsonResponse.contains("\"winnerSide\":\"B\""))
+                return "B";
+            return "UNCLEAR";
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "UNCLEAR";
         }
     }
 }

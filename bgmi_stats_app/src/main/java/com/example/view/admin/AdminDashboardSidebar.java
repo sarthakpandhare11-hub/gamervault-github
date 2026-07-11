@@ -93,6 +93,13 @@ public class AdminDashboardSidebar {
             System.out.println("DEBUG: SIDEBAR TOURNAMENT MANAGEMENT CLICKED");
         });
 
+        Button disputeResolutionBtn = new Button("⚖️ Dispute Resolution");
+        applyStyling(disputeResolutionBtn, pageView.equals("disputeResolution"));
+        disputeResolutionBtn.setOnAction(event -> {
+            pageView = "disputeResolution";
+            mainScreen.updateCenter();
+        });
+
         Button userManagementButton = new Button("🤝  User Management");
         applyStyling(userManagementButton, pageView.equals("userManagement"));
         userManagementButton.setOnAction(event -> {
@@ -121,6 +128,7 @@ public class AdminDashboardSidebar {
                 dashboardButton,
                 contentHubButton,
                 tournamentManagementButton,
+                disputeResolutionBtn,
                 userManagementButton,
                 templatesBtn,
                 adminProfileButton);

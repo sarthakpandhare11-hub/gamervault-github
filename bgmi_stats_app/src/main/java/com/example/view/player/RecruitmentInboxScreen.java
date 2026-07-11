@@ -110,122 +110,6 @@ public class RecruitmentInboxScreen {
         }).start();
     }
 
-    // private HBox createApplicationCard(ApplicationModel app) {
-    // // Main Card Container - Using Horizontal Layout for Dashboard Feel
-    // HBox card = new HBox(20);
-    // card.setAlignment(Pos.CENTER_LEFT);
-    // card.setPadding(new Insets(20));
-    // card.setStyle(
-    // "-fx-background-color: rgba(255,255,255,0.03); " +
-    // "-fx-background-radius: 12; " +
-    // "-fx-border-color: rgba(255,255,255,0.08); " +
-    // "-fx-border-radius: 12;");
-    // GamerVaultAnimations.scaleOnHover(card, 1.02); // Add subtle pop on hover
-
-    // // 1. LEFT SECTION: Avatar & Identity
-    // HBox identityBox = new HBox(15);
-    // identityBox.setAlignment(Pos.CENTER_LEFT);
-    // identityBox.setPrefWidth(250);
-
-    // StackPane avatar = new StackPane();
-    // avatar.setPrefSize(50, 50);
-    // avatar.setStyle(
-    // "-fx-background-color: rgba(139,92,246,0.15); -fx-background-radius: 10;
-    // -fx-border-color: rgba(139,92,246,0.4); -fx-border-radius: 10;");
-
-    // String initial = (app.getApplicantName() != null &&
-    // !app.getApplicantName().isEmpty())
-    // ? app.getApplicantName().substring(0, 1).toUpperCase()
-    // : "?";
-    // Text avatarInitials = new Text(initial);
-    // avatarInitials.setFill(Color.web(GamerVaultStyles.ACCENT_PURPLE_LIGHT));
-    // avatarInitials.setFont(Font.font("Arial", FontWeight.BOLD, 22));
-    // avatar.getChildren().add(avatarInitials);
-
-    // VBox nameRoleBox = new VBox(5);
-    // nameRoleBox.setAlignment(Pos.CENTER_LEFT);
-
-    // Text nameLabel = new Text(app.getApplicantName());
-    // nameLabel.setFill(Color.web(GamerVaultStyles.TEXT_PRIMARY));
-    // nameLabel.setFont(Font.font("Arial", FontWeight.BOLD, 18));
-
-    // // Dynamic Role Badge Color
-    // String roleColor = getRoleColorHex(app.getSnapshotRoleArchetype());
-    // StackPane roleBadge = new StackPane();
-    // roleBadge.setPadding(new Insets(3, 8, 3, 8));
-    // roleBadge.setStyle("-fx-background-color: " + roleColor + "20;
-    // -fx-background-radius: 4; -fx-border-color: "
-    // + roleColor + "60; -fx-border-radius: 4;");
-    // Text roleLabel = new Text(app.getSnapshotRoleArchetype());
-    // roleLabel.setFill(Color.web(roleColor));
-    // roleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 10));
-    // roleBadge.getChildren().add(roleLabel);
-
-    // nameRoleBox.getChildren().addAll(nameLabel, roleBadge);
-    // identityBox.getChildren().addAll(avatar, nameRoleBox);
-
-    // // 2. CENTER SECTION: HUD Stat Blocks
-    // HBox statsBox = new HBox(15);
-    // statsBox.setAlignment(Pos.CENTER);
-
-    // statsBox.getChildren().addAll(
-    // createStatBlock("F/D RATIO", String.format("%.2f", app.getSnapshotFdRatio()),
-    // GamerVaultStyles.ACCENT_CYAN),
-    // createStatBlock("AVG DMG", String.format("%.0f", app.getSnapshotAvgDamage()),
-    // "#F43F5E"),
-    // createStatBlock("TIER", app.getSnapshotSkillTier(), "#F59E0B"));
-
-    // Region spacer = new Region();
-    // HBox.setHgrow(spacer, Priority.ALWAYS);
-
-    // // 3. RIGHT SECTION: Actions
-    // HBox actionBox = new HBox(12);
-    // actionBox.setAlignment(Pos.CENTER_RIGHT);
-
-    // Button btnDecline = new Button("Decline");
-    // btnDecline.setPrefHeight(38);
-    // btnDecline.setPrefWidth(100);
-    // btnDecline.setStyle(
-    // "-fx-background-color: rgba(239, 68, 68, 0.1); -fx-text-fill: #ef4444;
-    // -fx-border-color: rgba(239, 68, 68, 0.4); -fx-border-radius: 6;
-    // -fx-background-radius: 6; -fx-font-weight: bold; -fx-cursor: hand;");
-
-    // // Decline Hover logic
-    // btnDecline.setOnMouseEntered(e -> btnDecline.setStyle(
-    // "-fx-background-color: #ef4444; -fx-text-fill: white; -fx-border-color:
-    // #ef4444; -fx-border-radius: 6; -fx-background-radius: 6; -fx-font-weight:
-    // bold; -fx-cursor: hand;"));
-    // btnDecline.setOnMouseExited(e -> btnDecline.setStyle(
-    // "-fx-background-color: rgba(239, 68, 68, 0.1); -fx-text-fill: #ef4444;
-    // -fx-border-color: rgba(239, 68, 68, 0.4); -fx-border-radius: 6;
-    // -fx-background-radius: 6; -fx-font-weight: bold; -fx-cursor: hand;"));
-
-    // btnDecline.setOnAction(e -> handleAction(app.getApplicationId(), false,
-    // card));
-
-    // Button btnAccept = new Button("Accept Connection");
-    // btnAccept.setPrefHeight(38);
-    // btnAccept.setPrefWidth(150);
-    // btnAccept.setStyle(
-    // "-fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold;
-    // -fx-background-radius: 6; -fx-cursor: hand;");
-
-    // // Drop shadow for primary button
-    // btnAccept.setOnMouseEntered(e -> btnAccept.setStyle(
-    // "-fx-background-color: #059669; -fx-text-fill: white; -fx-font-weight: bold;
-    // -fx-background-radius: 6; -fx-cursor: hand;"));
-    // btnAccept.setOnMouseExited(e -> btnAccept.setStyle(
-    // "-fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold;
-    // -fx-background-radius: 6; -fx-cursor: hand;"));
-
-    // btnAccept.setOnAction(e -> handleAction(app.getApplicationId(), true, card));
-
-    // actionBox.getChildren().addAll(btnDecline, btnAccept);
-
-    // card.getChildren().addAll(identityBox, statsBox, spacer, actionBox);
-    // return card;
-    // }
-
     private HBox createApplicationCard(ApplicationModel app) {
         HBox card = new HBox(20);
         card.setAlignment(Pos.CENTER_LEFT);
@@ -277,14 +161,15 @@ public class RecruitmentInboxScreen {
         HBox statsBox = new HBox(15);
         statsBox.setAlignment(Pos.CENTER);
 
-        // FIX #3 & #4: Fixed Labels. F/D is now AVG KILLS, and Tier handles UNRANKED
-        // cleanly.
-        String tierColor = app.getSnapshotSkillTier().equals("UNRANKED") ? "#6B7280" : "#F59E0B";
+        String skillTier = app.getSnapshotSkillTier() != null ? app.getSnapshotSkillTier() : "UNRANKED";
+
+        String tierColor = skillTier.equals("UNRANKED") ? "#6B7280" : "#F59E0B";
+
         statsBox.getChildren().addAll(
                 createStatBlock("AVG KILLS", String.format("%.1f", app.getSnapshotFdRatio()),
                         GamerVaultStyles.ACCENT_CYAN),
                 createStatBlock("AVG DMG", String.format("%.0f", app.getSnapshotAvgDamage()), "#F43F5E"),
-                createStatBlock("TIER", app.getSnapshotSkillTier(), tierColor));
+                createStatBlock("TIER", skillTier, tierColor));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);

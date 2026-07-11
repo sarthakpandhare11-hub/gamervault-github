@@ -94,6 +94,8 @@ public class AdminMainScreen {
                 return new ContentManagementScreen().startContentManagementScreen();
             case "tournamentManagement":
                 return new TournamentManagementScreen().startTournamentManagementScreen();
+            case "disputeResolution":
+                return new AdminDisputeScreen().startAdminDisputeScreen();
             case "userManagement":
                 return new UserManagementScreen().startUserManagementScreen();
             case "templates":

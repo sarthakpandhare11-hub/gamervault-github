@@ -188,4 +188,127 @@ public class BattleDao {
             return false;
         }
     }
+
+    /**
+     * Atomically saves round evidence to prevent concurrent overwrite races.
+     */
+    public static boolean submitRoundEvidenceTransaction(String battleId, int roundIndex, String teamSide,
+            String claimedOutcome, String actualWinningTeam, String uploadedUrl) {
+        Firestore db = FirestoreClient.getFirestore();
+        DocumentReference battleRef = db.collection(BattleFirebaseKeys.COLLECTION_BATTLES).document(battleId);
+
+        try {
+            return db.runTransaction(txn -> {
+                BattleModel battle = txn.get(battleRef).get().toObject(BattleModel.class);
+                if (battle == null)
+                    return false;
+
+                com.example.model.player.RoundModel round = battle.getRounds().get(roundIndex);
+                if (teamSide.equals("A")) {
+                    round.setTeamAClaimedOutcome(claimedOutcome);
+                    round.setTeamAOcrResult(actualWinningTeam);
+                    round.setTeamAScreenshotUrl(uploadedUrl);
+                } else {
+                    round.setTeamBClaimedOutcome(claimedOutcome);
+                    round.setTeamBOcrResult(actualWinningTeam);
+                    round.setTeamBScreenshotUrl(uploadedUrl);
+                }
+
+                txn.set(battleRef, battle);
+                return true;
+            }).get();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Fetches battles that require manual admin intervention
+    public static List<BattleModel> getDisputedBattles() {
+        List<BattleModel> disputes = new ArrayList<>();
+        try {
+            ApiFuture<QuerySnapshot> future = getDb().collection(BattleFirebaseKeys.COLLECTION_BATTLES)
+                    .whereEqualTo(BattleFirebaseKeys.FIELD_STATUS, BattleFirebaseKeys.STATUS_DISPUTED)
+                    .get();
+
+            for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
+                disputes.add(doc.toObject(BattleModel.class));
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
+        return disputes;
+    }
+
+    /**
+     * STAGE 1: Saves a player's uploaded evidence URL and Claim to the database.
+     * Does NOT run the AI evaluation yet.
+     */
+    public static boolean saveEvidenceUrlTransaction(String battleId, int roundIndex, String teamSide,
+            String claimedOutcome, String uploadedUrl, String submitterId) {
+        com.google.cloud.firestore.Firestore db = com.google.firebase.cloud.FirestoreClient.getFirestore();
+        com.google.cloud.firestore.DocumentReference battleRef = db.collection(BattleFirebaseKeys.COLLECTION_BATTLES)
+                .document(battleId);
+
+        try {
+            return db.runTransaction(txn -> {
+                BattleModel battle = txn.get(battleRef).get().toObject(BattleModel.class);
+                if (battle == null)
+                    return false;
+
+                com.example.model.player.RoundModel round = battle.getRounds().get(roundIndex);
+                if (teamSide.equals("A")) {
+                    round.setTeamAClaimedOutcome(claimedOutcome);
+                    round.setTeamAScreenshotUrl(uploadedUrl);
+                    round.setTeamASubmittedBy(submitterId);
+                } else {
+                    round.setTeamBClaimedOutcome(claimedOutcome);
+                    round.setTeamBScreenshotUrl(uploadedUrl);
+                    round.setTeamBSubmittedBy(submitterId);
+                }
+
+                txn.set(battleRef, battle);
+                return true;
+            }).get();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * STAGE 2: Saves the final Dual-AI decision and shifts the match to
+     * RESULT_PENDING.
+     */
+    public static boolean saveDualVerificationResult(String battleId, int roundIndex, String aiDeclaredWinner) {
+        com.google.cloud.firestore.Firestore db = com.google.firebase.cloud.FirestoreClient.getFirestore();
+        com.google.cloud.firestore.DocumentReference battleRef = db.collection(BattleFirebaseKeys.COLLECTION_BATTLES)
+                .document(battleId);
+
+        try {
+            return db.runTransaction(txn -> {
+                BattleModel battle = txn.get(battleRef).get().toObject(BattleModel.class);
+                if (battle == null)
+                    return false;
+
+                com.example.model.player.RoundModel round = battle.getRounds().get(roundIndex);
+                round.setWinningTeam(aiDeclaredWinner);
+
+                // If it's a dispute, flag it. Otherwise, pend user confirmation.
+                if (aiDeclaredWinner.equals("DISPUTED") || aiDeclaredWinner.equals("UNCLEAR")) {
+                    round.setRoundStatus(BattleFirebaseKeys.STATUS_DISPUTED);
+                    battle.setStatus(BattleFirebaseKeys.STATUS_DISPUTED);
+                } else {
+                    round.setRoundStatus("RESULT_PENDING");
+                    battle.setStatus("RESULT_PENDING");
+                }
+
+                txn.set(battleRef, battle);
+                return true;
+            }).get();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

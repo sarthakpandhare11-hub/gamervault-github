@@ -1,12 +1,15 @@
 package com.example.view.player;
 
 import java.io.File;
+import java.util.UUID;
 
 import com.example.controller.AuthController;
 import com.example.controller.player.BattleRoomController;
 import com.example.dao.BattleDao;
+import com.example.dao.DisputeChatDao;
 import com.example.keys.BattleFirebaseKeys;
 import com.example.model.player.BattleModel;
+import com.example.model.player.ChatMessageModel;
 import com.example.model.player.RoundModel;
 import com.example.view.util.GamerVaultAnimations;
 import com.example.view.util.GamerVaultStyles;
@@ -327,6 +330,30 @@ public class ActiveBattleRoomScreen {
     }
 
     private VBox createEvidenceDesk(BattleModel battle) {
+        if (battle.getStatus().equals(BattleFirebaseKeys.STATUS_DISPUTED)) {
+            return createDisputeChatDesk(battle);
+        }
+        if (battle.getStatus().equals("PENDING_FORFEIT")) {
+            VBox desk = new VBox(15);
+            desk.setAlignment(Pos.CENTER);
+            desk.setPadding(new Insets(30));
+            GamerVaultStyles.applyGlassCard(desk);
+
+            Text t = new Text("Opponent Timed Out. Validating Forfeit...");
+            t.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+            t.setFill(Color.web(GamerVaultStyles.ACCENT_CYAN));
+
+            Text sub = new Text("The AI is currently analyzing your evidence to award the victory.");
+            sub.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+
+            desk.getChildren().addAll(t, sub);
+            return desk;
+        }
+
+        if (battle.getStatus().equals("RESULT_PENDING")) {
+            return createResultPendingDesk(battle);
+        }
+
         VBox desk = new VBox(15);
         desk.setAlignment(Pos.CENTER);
         desk.setPadding(new Insets(20));
@@ -413,6 +440,146 @@ public class ActiveBattleRoomScreen {
         }
 
         desk.getChildren().addAll(title, roundBox);
+        return desk;
+    }
+
+    private com.google.cloud.firestore.ListenerRegistration chatListener;
+
+    private VBox createDisputeChatDesk(BattleModel battle) {
+        VBox desk = new VBox(10);
+        desk.setPadding(new Insets(20));
+        desk.setPrefHeight(400);
+        GamerVaultStyles.applyGlassCard(desk);
+
+        Text title = new Text("🚨 Admin Dispute Chat");
+        title.setFill(Color.web("#EF4444"));
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+
+        Text sub = new Text("An admin has joined the room. Please explain the issue.");
+        sub.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+
+        // Chat History Box
+        VBox chatBox = new VBox(10);
+        chatBox.setPadding(new Insets(10));
+        javafx.scene.control.ScrollPane scroller = new javafx.scene.control.ScrollPane(chatBox);
+        GamerVaultStyles.applyStyledScrollPane(scroller);
+        scroller.setPrefHeight(250);
+        scroller.setVvalue(1.0); // Auto-scroll to bottom
+
+        // Input Area
+        HBox inputBox = new HBox(10);
+        javafx.scene.control.TextField messageField = new javafx.scene.control.TextField();
+        messageField.setPromptText("Type your message to the Admin...");
+        messageField.setPrefWidth(400);
+        messageField.setStyle(
+                "-fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: white; -fx-padding: 10; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 6;");
+
+        Button sendBtn = new Button("Send");
+        sendBtn.setStyle(
+                "-fx-background-color: #3B82F6; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+
+        String myUserId = AuthController.currentUser.getUserId();
+        String myTeam = battle.getParticipants().get(myUserId);
+        String senderName = "Team " + (myTeam != null ? myTeam : "Unknown");
+
+        sendBtn.setOnAction(e -> {
+            if (messageField.getText().trim().isEmpty())
+                return;
+            ChatMessageModel msg = new ChatMessageModel(
+                    UUID.randomUUID().toString(), myUserId, senderName, messageField.getText().trim(),
+                    System.currentTimeMillis());
+            DisputeChatDao.sendMessage(battle.getBattleId(), msg);
+            messageField.clear();
+        });
+
+        // Start listening to live messages
+        if (chatListener != null)
+            chatListener.remove();
+        chatListener = DisputeChatDao.listenToChat(battle.getBattleId(), messages -> {
+            Platform.runLater(() -> {
+                chatBox.getChildren().clear();
+                for (ChatMessageModel m : messages) {
+                    Text senderTxt = new Text(m.getSenderName() + ": ");
+                    senderTxt.setFill(m.getSenderName().equals("ADMIN") ? Color.web("#F59E0B")
+                            : Color.web(GamerVaultStyles.ACCENT_CYAN));
+                    senderTxt.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+
+                    Text msgTxt = new Text(m.getText());
+                    msgTxt.setFill(Color.WHITE);
+                    msgTxt.setWrappingWidth(380);
+
+                    HBox msgRow = new HBox(senderTxt, msgTxt);
+                    chatBox.getChildren().add(msgRow);
+                }
+                scroller.setVvalue(1.0); // Keep scrolled to bottom
+            });
+        });
+
+        inputBox.getChildren().addAll(messageField, sendBtn);
+        desk.getChildren().addAll(title, sub, scroller, inputBox);
+        return desk;
+    }
+
+    private VBox createResultPendingDesk(BattleModel battle) {
+        VBox desk = new VBox(15);
+        desk.setAlignment(Pos.CENTER);
+        desk.setPadding(new Insets(20));
+        GamerVaultStyles.applyGlassCard(desk);
+
+        Text title = new Text("AI Verification Complete");
+        title.setFill(Color.WHITE);
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 22));
+
+        // Get the latest round
+        com.example.model.player.RoundModel currentRound = battle.getRounds().get(battle.getRounds().size() - 1);
+        String myTeamSide = battle.getParticipants().get(AuthController.currentUser.getUserId());
+        boolean isWinner = myTeamSide != null && myTeamSide.equals(currentRound.getWinningTeam());
+
+        Text resultText = new Text("The AI has declared Team " + currentRound.getWinningTeam() + " as the winner.");
+        resultText.setFill(Color.web(GamerVaultStyles.ACCENT_CYAN));
+        resultText.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+
+        Text subText = new Text(isWinner ? "Congratulations! Please accept to receive your payout."
+                : "Better luck next time. Please accept to finalize the match.");
+        subText.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+
+        HBox actions = new HBox(20);
+        actions.setAlignment(Pos.CENTER);
+        actions.setPadding(new Insets(15, 0, 0, 0));
+
+        Button acceptBtn = new Button("Accept Result");
+        acceptBtn.setStyle(
+                "-fx-background-color: #10B981; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6; -fx-cursor: hand; -fx-padding: 10 20;");
+
+        Button disputeBtn = new Button("Report / Dispute");
+        disputeBtn.setStyle(
+                "-fx-background-color: transparent; -fx-text-fill: #EF4444; -fx-border-color: #EF4444; -fx-border-radius: 6; -fx-cursor: hand; -fx-padding: 10 20;");
+
+        // Action: Accept
+        acceptBtn.setOnAction(e -> {
+            acceptBtn.setDisable(true);
+            disputeBtn.setDisable(true);
+            acceptBtn.setText("Processing...");
+            new Thread(() -> {
+                // If accepted, immediately process payout
+                com.example.dao.BattleDao.resolveBattleFinancials(battle.getBattleId(),
+                        BattleFirebaseKeys.STATUS_COMPLETED, currentRound.getWinningTeam(), false);
+            }).start();
+        });
+
+        // Action: Dispute
+        disputeBtn.setOnAction(e -> {
+            acceptBtn.setDisable(true);
+            disputeBtn.setDisable(true);
+            disputeBtn.setText("Escalating...");
+            new Thread(() -> {
+                // Shift to disputed to freeze funds and summon admin
+                com.example.dao.BattleDao.updateBattleStatus(battle.getBattleId(), BattleFirebaseKeys.STATUS_DISPUTED);
+            }).start();
+        });
+
+        actions.getChildren().addAll(acceptBtn, disputeBtn);
+        desk.getChildren().addAll(title, resultText, subText, actions);
         return desk;
     }
 

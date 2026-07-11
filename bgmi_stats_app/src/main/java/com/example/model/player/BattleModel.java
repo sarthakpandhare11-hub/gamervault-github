@@ -34,6 +34,9 @@ public class BattleModel {
 
     private java.util.List<String> participantIds;
 
+    private String teamASubmittedBy;
+    private String teamBSubmittedBy;
+
     public BattleModel() {
     }
 
@@ -181,5 +184,21 @@ public class BattleModel {
 
     public void setParticipantIds(List<String> participantIds) {
         this.participantIds = participantIds;
+    }
+
+    public String getTeamASubmittedBy() {
+        return teamASubmittedBy;
+    }
+
+    public void setTeamASubmittedBy(String teamASubmittedBy) {
+        this.teamASubmittedBy = teamASubmittedBy;
+    }
+
+    public String getTeamBSubmittedBy() {
+        return teamBSubmittedBy;
+    }
+
+    public void setTeamBSubmittedBy(String teamBSubmittedBy) {
+        this.teamBSubmittedBy = teamBSubmittedBy;
     }
 }
