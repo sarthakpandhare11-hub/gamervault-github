@@ -37,4 +37,16 @@ public class ProfileDao {
             return false;
         }
     }
+
+    public static UserModel getUserProfileSync(String userId) {
+        try {
+            Firestore db = FirebaseManager.getDb();
+            DocumentSnapshot doc = db.collection(UserFirebaseKeys.USERS_COLLECTION)
+                    .document(userId).get().get();
+            return doc.exists() ? doc.toObject(UserModel.class) : null;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 }

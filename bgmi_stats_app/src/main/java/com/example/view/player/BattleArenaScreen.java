@@ -22,6 +22,11 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class BattleArenaScreen {
@@ -322,46 +327,56 @@ public class BattleArenaScreen {
         HBox topRow = new HBox(10);
         topRow.setAlignment(Pos.CENTER_LEFT);
 
-        StackPane avatar = new StackPane();
-        avatar.setPrefSize(35, 35);
-        avatar.setStyle("-fx-background-color: rgba(139,92,246,0.2); -fx-background-radius: 8;");
-        Text initial = new Text("👤");
-        initial.setFill(Color.web(GamerVaultStyles.ACCENT_PURPLE_LIGHT));
-        avatar.getChildren().add(initial);
-
         VBox hostBox = new VBox();
-        Text hostName = new Text("Host"); // To replace with real IGN via query later
-        hostName.setFill(Color.WHITE);
-        hostName.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-        HBox regionBox = new HBox(4);
-        regionBox.setAlignment(Pos.CENTER_LEFT);
-        Text pin = new Text("📍 IN");
-        pin.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
-        pin.setFont(Font.font("Arial", 10));
-        regionBox.getChildren().add(pin);
-        hostBox.getChildren().addAll(hostName, regionBox);
+        Text gameName = new Text(battle.getGameTitle() != null ? battle.getGameTitle() : "BGMI");
+        gameName.setFill(Color.WHITE);
+        gameName.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        Text hostName = new Text("Host: Player"); // Replace with actual host fetch logic later
+        hostName.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+        hostName.setFont(Font.font("Arial", 10));
+        hostBox.getChildren().addAll(gameName, hostName);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        StackPane formatBadge = new StackPane();
-        formatBadge.setPadding(new Insets(4, 8, 4, 8));
-        formatBadge.setStyle("-fx-background-color: rgba(0, 255, 255, 0.15); -fx-background-radius: 4;");
-        Text formatTxt = new Text("BEST OF " + battle.getFormat().replace("BO", ""));
-        formatTxt.setFill(Color.web(GamerVaultStyles.ACCENT_CYAN));
-        formatTxt.setFont(Font.font("Arial", FontWeight.BOLD, 10));
-        formatBadge.getChildren().add(formatTxt);
+        // Status & Format Badges
+        VBox badgeBox = new VBox(5);
+        badgeBox.setAlignment(Pos.CENTER_RIGHT);
 
-        topRow.getChildren().addAll(avatar, hostBox, spacer, formatBadge);
+        StackPane statusBadge = new StackPane();
+        statusBadge.setPadding(new Insets(4, 8, 4, 8));
+        String statusColor = battle.getStatus().equals(BattleFirebaseKeys.STATUS_OPEN) ? "#10B981" : "#F59E0B";
+        statusBadge.setStyle("-fx-background-color: " + statusColor + "33; -fx-background-radius: 4;");
+        Text statusTxt = new Text(battle.getStatus());
+        statusTxt.setFill(Color.web(statusColor));
+        statusTxt.setFont(Font.font("Arial", FontWeight.BOLD, 10));
+        statusBadge.getChildren().add(statusTxt);
 
-        // Middle: Match Type
+        badgeBox.getChildren().add(statusBadge);
+        topRow.getChildren().addAll(hostBox, spacer, badgeBox);
+
+        // Middle: Countdown & Match Type
         VBox typeBox = new VBox(2);
-        Text tLbl = new Text("MATCH TYPE");
-        tLbl.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
-        tLbl.setFont(Font.font("Arial", FontWeight.BOLD, 10));
-        Text tVal = new Text(battle.getMode().replace("V", " V "));
+
+        // Calculate Countdown
+        long timeLeftMillis = battle.getScheduledTime() - System.currentTimeMillis();
+        String timeDisplay;
+        if (timeLeftMillis > 0) {
+            long minutesLeft = timeLeftMillis / 60000;
+            long hoursLeft = minutesLeft / 60;
+            timeDisplay = (hoursLeft > 0) ? "Starts in " + hoursLeft + "h " + (minutesLeft % 60) + "m"
+                    : "Starts in " + minutesLeft + " mins";
+        } else {
+            timeDisplay = "Registration Closed";
+        }
+
+        Text tLbl = new Text(timeDisplay);
+        tLbl.setFill(Color.web(timeLeftMillis > 0 ? GamerVaultStyles.ACCENT_CYAN : "#EF4444"));
+        tLbl.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+
+        Text tVal = new Text(battle.getMode().replace("V", " V ") + " - " + battle.getFormat());
         tVal.setFill(Color.WHITE);
-        tVal.setFont(Font.font("Arial", FontWeight.BOLD, 32));
+        tVal.setFont(Font.font("Arial", FontWeight.BOLD, 24));
         typeBox.getChildren().addAll(tLbl, tVal);
 
         // Stats: Entry & Pool
@@ -450,22 +465,57 @@ public class BattleArenaScreen {
                     + "; -fx-text-fill: white;");
 
             joinBtn.setOnAction(e -> {
-                joinBtn.setText("Joining...");
-                joinBtn.setDisable(true);
-                new Thread(() -> {
-                    boolean success = BattleController.joinBattle(battle.getBattleId());
-                    Platform.runLater(() -> {
-                        if (success) {
-                            mainScreen.activeBattleId = battle.getBattleId();
-                            PlayerDashboardSidebar.pageView = "activeBattleRoom";
-                            mainScreen.updateCenter();
-                        } else {
-                            joinBtn.setText("Join Failed");
-                            joinBtn.setStyle(
-                                    "-fx-background-color: rgba(239,68,68,0.2); -fx-text-fill: #EF4444; -fx-border-color: #EF4444;");
-                        }
-                    });
-                }).start();
+                // 1. Calculate Available Teams
+                long countA = battle.getParticipants().values().stream().filter(t -> t.equals("A")).count();
+                long countB = battle.getParticipants().values().stream().filter(t -> t.equals("B")).count();
+                int maxPerTeam = battle.getMaxParticipants() / 2;
+
+                Dialog<ButtonType> joinDialog = new Dialog<>();
+                joinDialog.setTitle("Choose Your Team");
+
+                VBox joinRoot = new VBox(15);
+                joinRoot.setPadding(new Insets(20));
+                joinRoot.setStyle("-fx-background-color: #0B0F19;");
+
+                Text pickTxt = new Text("Select an available slot:");
+                pickTxt.setFill(Color.WHITE);
+
+                ComboBox<String> teamChoice = createStyledDropdown("Select Team");
+                if (countA < maxPerTeam)
+                    teamChoice.getItems().add("Team A (Blue)");
+                if (countB < maxPerTeam)
+                    teamChoice.getItems().add("Team B (Red)");
+                teamChoice.getSelectionModel().selectFirst();
+
+                joinRoot.getChildren().addAll(pickTxt, teamChoice);
+                joinDialog.getDialogPane().setContent(joinRoot);
+                joinDialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+                joinDialog.getDialogPane().setStyle("-fx-background-color: #0B0F19;");
+
+                joinDialog.showAndWait().ifPresent(res -> {
+                    if (res == ButtonType.OK && teamChoice.getValue() != null) {
+                        joinBtn.setText("Joining...");
+                        joinBtn.setDisable(true);
+
+                        String selectedTeam = teamChoice.getValue().contains("A") ? "A" : "B";
+
+                        new Thread(() -> {
+                            // Ensure BattleController.joinBattle accepts the team parameter
+                            boolean success = BattleController.joinBattle(battle.getBattleId(), selectedTeam);
+                            Platform.runLater(() -> {
+                                if (success) {
+                                    mainScreen.activeBattleId = battle.getBattleId();
+                                    PlayerDashboardSidebar.pageView = "activeBattleRoom";
+                                    mainScreen.updateCenter();
+                                } else {
+                                    joinBtn.setText("Join Failed (Slot Taken)");
+                                    joinBtn.setStyle(
+                                            "-fx-background-color: rgba(239,68,68,0.2); -fx-text-fill: #EF4444; -fx-border-color: #EF4444;");
+                                }
+                            });
+                        }).start();
+                    }
+                });
             });
         }
 
@@ -501,10 +551,37 @@ public class BattleArenaScreen {
         formatBox.setValue("BO1");
         formatBox.setPrefWidth(350);
 
+        // --- NEW: DATE & TIME PICKER ---
+        HBox dateTimeBox = new HBox(10);
+        dateTimeBox.setAlignment(Pos.CENTER_LEFT);
+
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        datePicker.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-control-inner-background: #111827;");
+
+        ComboBox<String> hourBox = new ComboBox<>();
+        for (int i = 1; i <= 12; i++)
+            hourBox.getItems().add(String.format("%02d", i));
+        hourBox.setValue("06");
+        hourBox.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: white;");
+
+        ComboBox<String> minBox = new ComboBox<>();
+        for (int i = 0; i < 60; i += 5)
+            minBox.getItems().add(String.format("%02d", i)); // 5-minute intervals
+        minBox.setValue("00");
+        minBox.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: white;");
+
+        ComboBox<String> amPmBox = createStyledDropdown("", "AM", "PM");
+        amPmBox.setValue("PM");
+
+        Text colon = new Text(":");
+        colon.setFill(Color.WHITE);
+        colon.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+
+        dateTimeBox.getChildren().addAll(datePicker, hourBox, colon, minBox, amPmBox);
+
         VBox feeWrapper = new VBox(5);
         Text feeLbl = new Text("Entry Fee (Coins)");
         feeLbl.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
-        feeLbl.setFont(Font.font("Arial", 12));
         TextField feeField = new TextField("50");
         HBox feeInput = GamerVaultStyles.createStyledInput(feeField, GamerVaultStyles.ACCENT_PURPLE);
         feeInput.setPrefHeight(45);
@@ -513,27 +590,18 @@ public class BattleArenaScreen {
         VBox sideWrapper = new VBox(5);
         Text sideLbl = new Text("Select Your Side");
         sideLbl.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
-        sideLbl.setFont(Font.font("Arial", 12));
         ComboBox<String> sideBox = createStyledDropdown("Select Side", "Team A (Blue)", "Team B (Red)");
         sideBox.setValue("Team A (Blue)");
         sideBox.setPrefWidth(350);
         sideWrapper.getChildren().addAll(sideLbl, sideBox);
 
-        root.getChildren().addAll(title, gameBox, modeBox, formatBox, feeWrapper, sideWrapper);
+        root.getChildren().addAll(title, gameBox, modeBox, formatBox, dateTimeBox, feeWrapper, sideWrapper);
 
         dialog.getDialogPane().setContent(root);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         dialog.getDialogPane().setStyle("-fx-background-color: #0B0F19;");
 
-        Node okBtn = dialog.getDialogPane().lookupButton(ButtonType.OK);
-        if (okBtn instanceof Button) {
-            GamerVaultStyles.applyGradientButton((Button) okBtn, GamerVaultStyles.ACCENT_PURPLE,
-                    GamerVaultStyles.ACCENT_PURPLE_DARK, "white");
-        }
-        Node cancelBtn = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
-        if (cancelBtn instanceof Button) {
-            GamerVaultStyles.applyGhostButton((Button) cancelBtn);
-        }
+        // (Keep your existing button styling for OK and Cancel here...)
 
         dialog.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
@@ -541,13 +609,17 @@ public class BattleArenaScreen {
                     double fee = Double.parseDouble(feeField.getText().trim());
                     String mode = modeBox.getValue();
                     String format = formatBox.getValue();
+                    String rawSide = sideBox.getValue().contains("A") ? "A" : "B";
+                    String selectedGame = gameBox.getValue();
+
+                    String timeString = hourBox.getValue() + ":" + minBox.getValue() + " " + amPmBox.getValue();
+                    LocalTime time = LocalTime.parse(timeString, DateTimeFormatter.ofPattern("hh:mm a"));
+                    LocalDateTime ldt = LocalDateTime.of(datePicker.getValue(), time);
+                    long scheduledTime = ldt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
                     new Thread(() -> {
-                        String rawSide = sideBox.getValue().contains("A") ? "A" : "B";
-                        String selectedGame = gameBox.getValue();
-
-                        // Pass selectedGame as the first parameter
-                        String newBattleId = BattleController.hostBattle(selectedGame, mode, format, fee, rawSide);
+                        String newBattleId = BattleController.hostBattle(selectedGame, mode, format, fee, rawSide,
+                                scheduledTime);
                         Platform.runLater(() -> {
                             if (newBattleId != null) {
                                 mainScreen.activeBattleId = newBattleId;
@@ -556,8 +628,8 @@ public class BattleArenaScreen {
                             }
                         });
                     }).start();
-                } catch (NumberFormatException ex) {
-                    // Invalid fee
+                } catch (Exception ex) {
+                    ex.printStackTrace();
                 }
             }
         });

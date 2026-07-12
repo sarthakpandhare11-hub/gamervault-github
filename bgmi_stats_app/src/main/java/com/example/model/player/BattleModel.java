@@ -32,10 +32,14 @@ public class BattleModel {
     private long createdAt;
     private long lockedAt;
 
-    private java.util.List<String> participantIds;
+    private List<String> participantIds;
 
     private String teamASubmittedBy;
     private String teamBSubmittedBy;
+
+    private String disputeReason;
+
+    private long scheduledTime; // Store as Epoch Milliseconds
 
     public BattleModel() {
     }
@@ -200,5 +204,21 @@ public class BattleModel {
 
     public void setTeamBSubmittedBy(String teamBSubmittedBy) {
         this.teamBSubmittedBy = teamBSubmittedBy;
+    }
+
+    public String getDisputeReason() {
+        return disputeReason;
+    }
+
+    public void setDisputeReason(String disputeReason) {
+        this.disputeReason = disputeReason;
+    }
+
+    public long getScheduledTime() {
+        return scheduledTime;
+    }
+
+    public void setScheduledTime(long scheduledTime) {
+        this.scheduledTime = scheduledTime;
     }
 }

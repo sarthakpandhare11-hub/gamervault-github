@@ -104,9 +104,11 @@ public class BattleRoomController {
         }).start();
     }
 
-    /**
-     * Downloads the opponent's image and feeds both into the Gemini Referee.
-     */
+    public static void evaluateRound(BattleModel battle, int roundIndex) {
+        applyEvaluationLogic(battle, roundIndex);
+        checkOverallBattleCompletion(battle);
+    }
+
     private void triggerDualAIVerification(BattleModel battle, int roundIndex, File localScreenshot,
             String myTeamSide) {
         RoundModel round = battle.getRounds().get(roundIndex);
@@ -120,26 +122,17 @@ public class BattleRoomController {
             byte[] imageA = myTeamSide.equals("A") ? myImageBytes : opponentImageBytes;
             byte[] imageB = myTeamSide.equals("B") ? myImageBytes : opponentImageBytes;
 
-            // 2. Send BOTH to Gemini
-            DualMatchResultModel aiResult = GeminiVisionController
-                    .analyzeDualMatchImages(imageA, imageB, battle.getGameTitle());
+            // 2. Send BOTH to Gemini (Removed battle.getGameTitle() here)
+            DualMatchResultModel aiResult = GeminiVisionController.analyzeDualMatchImages(imageA, imageB);
 
-            // 3. Fraud Detection
-            String finalDecision;
-            if (!aiResult.isSameMatch) {
-                // Someone uploaded a fake/unrelated screenshot! Send straight to Admin Dispute
-                // Queue
-                finalDecision = "DISPUTED";
-            } else {
-                finalDecision = aiResult.winnerSide;
-            }
-
-            // 4. Transactionally save result and change status
-            BattleDao.saveDualVerificationResult(battle.getBattleId(), roundIndex, finalDecision);
+            // 3. Transactionally save result and handle fraud/status changes natively
+            BattleDao.saveDualVerificationResult(battle.getBattleId(), roundIndex, aiResult);
 
         } catch (Exception e) {
             e.printStackTrace();
-            BattleDao.saveDualVerificationResult(battle.getBattleId(), roundIndex, "DISPUTED");
+            DualMatchResultModel errorFallback = new DualMatchResultModel();
+            // Fallback object to trigger UNCLEAR state in the DAO
+            BattleDao.saveDualVerificationResult(battle.getBattleId(), roundIndex, errorFallback);
         }
     }
 
@@ -164,7 +157,7 @@ public class BattleRoomController {
             return;
         }
 
-        com.example.model.player.RoundModel round = battle.getRounds().get(roundIndex);
+        RoundModel round = battle.getRounds().get(roundIndex);
 
         long currentTime = System.currentTimeMillis();
         long startTime = battle.getLockedAt() > 0 ? battle.getLockedAt() : battle.getCreatedAt();
@@ -174,89 +167,64 @@ public class BattleRoomController {
         boolean hasClaimB = round.getTeamBClaimedOutcome() != null;
         boolean timeExpired = currentTime > deadline;
 
-        // SCENARIO 3: Time expired, NO ONE submitted. Cancel & 80% Refund
+        // SCENARIO 3: Time expired, NO ONE submitted. Auto-Cancel & 80% Refund.
         if (timeExpired && !hasClaimA && !hasClaimB) {
             round.setRoundStatus(BattleFirebaseKeys.STATUS_CANCELLED);
             battle.setStatus(BattleFirebaseKeys.STATUS_CANCELLED);
         }
-        // SCENARIO 4: Time expired, ONLY ONE submitted. Trigger AI Forfeit Check
-        else if (timeExpired && (hasClaimA ^ hasClaimB) && !battle.getStatus().equals("PENDING_FORFEIT")) {
-            round.setRoundStatus("PENDING_FORFEIT");
-            battle.setStatus("PENDING_FORFEIT");
-        }
-    }
-
-    public static void evaluateRound(BattleModel battle, int roundIndex) {
-        applyEvaluationLogic(battle, roundIndex);
-
-        // Handle the new Forfeit Validation State
-        if (battle.getStatus().equals("PENDING_FORFEIT")) {
-            com.example.dao.BattleDao.updateBattleStatus(battle.getBattleId(), "PENDING_FORFEIT");
-            boolean hasClaimA = battle.getRounds().get(roundIndex).getTeamAClaimedOutcome() != null;
-
-            // Spin up a thread to validate the single image
-            new Thread(() -> validateAndExecuteForfeit(battle, roundIndex, hasClaimA)).start();
-            return; // Stop checkOverallBattleCompletion until the thread finishes
-        }
-
-        checkOverallBattleCompletion(battle);
-    }
-
-    /**
-     * Downloads the single uploaded image, asks Gemini if it's real, and pays out
-     * or penalizes.
-     */
-    private static void validateAndExecuteForfeit(BattleModel battle, int roundIndex, boolean isTeamA) {
-        try {
-            com.example.model.player.RoundModel round = battle.getRounds().get(roundIndex);
-            String imageUrl = isTeamA ? round.getTeamAScreenshotUrl() : round.getTeamBScreenshotUrl();
-
-            // 1. Download Image
-            byte[] imageBytes = downloadImageToBytes(imageUrl);
-
-            // 2. Validate with Gemini
-            String aiResult = com.example.controller.gemini.GeminiVisionController.validateSingleMatchImage(imageBytes,
-                    battle.getGameTitle());
-
-            // 3. Resolve
-            if ("A".equals(aiResult)) {
-                // Legitimate win! Award the forfeit victory.
-                String winningTeam = isTeamA ? "A" : "B";
-                com.example.dao.BattleDao.resolveBattleFinancials(battle.getBattleId(),
-                        BattleFirebaseKeys.STATUS_COMPLETED, winningTeam, false);
-            } else {
-                // Fraud caught! They uploaded a fake image hoping for a free forfeit win.
-                // Cancel the match and refund both parties 80% (or void completely).
-                com.example.dao.BattleDao.resolveBattleFinancials(battle.getBattleId(),
-                        BattleFirebaseKeys.STATUS_CANCELLED, null, true);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            com.example.dao.BattleDao.resolveBattleFinancials(battle.getBattleId(), BattleFirebaseKeys.STATUS_CANCELLED,
-                    null, true);
+        // SCENARIO 4: Time expired, ONLY ONE submitted. Route straight to Admin!
+        else if (timeExpired && (hasClaimA ^ hasClaimB)
+                && !battle.getStatus().equals(BattleFirebaseKeys.STATUS_DISPUTED)) {
+            round.setRoundStatus(BattleFirebaseKeys.STATUS_DISPUTED);
+            battle.setStatus(BattleFirebaseKeys.STATUS_DISPUTED);
+            battle.setDisputeReason("TIMEOUT_ONE_SIDED"); // Gap 4 Tagging
         }
     }
 
     private static void checkOverallBattleCompletion(BattleModel battle) {
-        long aWins = battle.getRounds().stream().filter(r -> "A".equals(r.getWinningTeam())).count();
-        long bWins = battle.getRounds().stream().filter(r -> "B".equals(r.getWinningTeam())).count();
+        // Only count rounds that have been fully completed (mutually accepted or admin
+        // forced)
+        long aWins = battle.getRounds().stream().filter(
+                r -> "A".equals(r.getWinningTeam()) && BattleFirebaseKeys.STATUS_COMPLETED.equals(r.getRoundStatus()))
+                .count();
+        long bWins = battle.getRounds().stream().filter(
+                r -> "B".equals(r.getWinningTeam()) && BattleFirebaseKeys.STATUS_COMPLETED.equals(r.getRoundStatus()))
+                .count();
+
         int winsNeeded = battle.getFormat().equals("BO3") ? 2 : 1;
 
-        if (aWins >= winsNeeded) {
-            // Send to Payout Engine (Winner: Team A, Refund: false)
-            BattleDao.resolveBattleFinancials(battle.getBattleId(), BattleFirebaseKeys.STATUS_COMPLETED, "A", false);
-        } else if (bWins >= winsNeeded) {
-            // Send to Payout Engine (Winner: Team B, Refund: false)
-            BattleDao.resolveBattleFinancials(battle.getBattleId(), BattleFirebaseKeys.STATUS_COMPLETED, "B", false);
-        } else if (battle.getRounds().stream()
-                .anyMatch(r -> BattleFirebaseKeys.STATUS_DISPUTED.equals(r.getRoundStatus()))) {
+        // Check for disputes FIRST (Fixing your flagged BO3 Dispute Override Bug)
+        if (battle.getRounds().stream().anyMatch(r -> BattleFirebaseKeys.STATUS_DISPUTED.equals(r.getRoundStatus()))) {
             battle.setStatus(BattleFirebaseKeys.STATUS_DISPUTED);
-            BattleDao.saveBattle(battle); // Just freeze it for admin review, no money moves yet.
-        } else if (battle.getStatus().equals(BattleFirebaseKeys.STATUS_CANCELLED)) {
-            // Send to Refund Engine (Winner: null, Refund: true)
-            BattleDao.resolveBattleFinancials(battle.getBattleId(), BattleFirebaseKeys.STATUS_CANCELLED, null, true);
-        } else {
-            BattleDao.saveBattle(battle); // Standard mid-match save
+            BattleDao.saveBattle(battle); // Freeze for admin
+            return;
         }
+
+        // Evaluate total wins
+        if (aWins >= winsNeeded) {
+            BattleDao.resolveBattleFinancials(battle.getBattleId(), BattleFirebaseKeys.STATUS_COMPLETED, "A", 0.0);
+        } else if (bWins >= winsNeeded) {
+            BattleDao.resolveBattleFinancials(battle.getBattleId(), BattleFirebaseKeys.STATUS_COMPLETED, "B", 0.0);
+        } else if (battle.getStatus().equals(BattleFirebaseKeys.STATUS_CANCELLED)) {
+            BattleDao.resolveBattleFinancials(battle.getBattleId(), BattleFirebaseKeys.STATUS_CANCELLED, null, 0.8);
+        } else {
+            BattleDao.saveBattle(battle); // Save mid-match state (e.g., Round 1 finished, waiting for Round 2)
+        }
+    }
+
+    public static void handlePlayerAccept(String battleId, int roundIndex, String teamSide) {
+        new Thread(() -> {
+            boolean success = BattleDao.acceptRoundTransaction(battleId, roundIndex, teamSide);
+            if (success) {
+                // Fetch fresh state to check if the opponent ALSO accepted
+                BattleModel freshBattle = BattleDao.getBattleById(battleId);
+                RoundModel round = freshBattle.getRounds().get(roundIndex);
+
+                if (round.isAcceptedByA() && round.isAcceptedByB()) {
+                    round.setRoundStatus(BattleFirebaseKeys.STATUS_COMPLETED);
+                    checkOverallBattleCompletion(freshBattle);
+                }
+            }
+        }).start();
     }
 }

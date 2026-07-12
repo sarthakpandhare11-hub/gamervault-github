@@ -19,6 +19,23 @@ public class RoundModel {
     private String roundStatus; // "PENDING", "VERIFIED", "DISPUTED"
     private String winningTeam; // "A", "B", or "NONE"
 
+    private boolean acceptedByA = false;
+    private boolean acceptedByB = false;
+
+    // --- NEW: Team A Extracted Stats ---
+    private int teamAScore;
+    private int teamAKills;
+    private double teamAFdRatio;
+    private String teamAMvpIgn;
+    private int teamAAssists;
+
+    // --- NEW: Team B Extracted Stats ---
+    private int teamBScore;
+    private int teamBKills;
+    private double teamBFdRatio;
+    private String teamBMvpIgn;
+    private int teamBAssists;
+
     public RoundModel() {
     }
 
@@ -109,5 +126,103 @@ public class RoundModel {
 
     public void setWinningTeam(String winningTeam) {
         this.winningTeam = winningTeam;
+    }
+
+    public boolean isAcceptedByA() {
+        return acceptedByA;
+    }
+
+    public void setAcceptedByA(boolean acceptedByA) {
+        this.acceptedByA = acceptedByA;
+    }
+
+    public boolean isAcceptedByB() {
+        return acceptedByB;
+    }
+
+    public void setAcceptedByB(boolean acceptedByB) {
+        this.acceptedByB = acceptedByB;
+    }
+
+    // --- GETTERS & SETTERS FOR STATS ---
+
+    public int getTeamAScore() {
+        return teamAScore;
+    }
+
+    public void setTeamAScore(int teamAScore) {
+        this.teamAScore = teamAScore;
+    }
+
+    public int getTeamAKills() {
+        return teamAKills;
+    }
+
+    public void setTeamAKills(int teamAKills) {
+        this.teamAKills = teamAKills;
+    }
+
+    public double getTeamAFdRatio() {
+        return teamAFdRatio;
+    }
+
+    public void setTeamAFdRatio(double teamAFdRatio) {
+        this.teamAFdRatio = teamAFdRatio;
+    }
+
+    public String getTeamAMvpIgn() {
+        return teamAMvpIgn;
+    }
+
+    public void setTeamAMvpIgn(String teamAMvpIgn) {
+        this.teamAMvpIgn = teamAMvpIgn;
+    }
+
+    public int getTeamAAssists() {
+        return teamAAssists;
+    }
+
+    public void setTeamAAssists(int teamAAssists) {
+        this.teamAAssists = teamAAssists;
+    }
+
+    public int getTeamBScore() {
+        return teamBScore;
+    }
+
+    public void setTeamBScore(int teamBScore) {
+        this.teamBScore = teamBScore;
+    }
+
+    public int getTeamBKills() {
+        return teamBKills;
+    }
+
+    public void setTeamBKills(int teamBKills) {
+        this.teamBKills = teamBKills;
+    }
+
+    public double getTeamBFdRatio() {
+        return teamBFdRatio;
+    }
+
+    public void setTeamBFdRatio(double teamBFdRatio) {
+        this.teamBFdRatio = teamBFdRatio;
+    }
+
+    public String getTeamBMvpIgn() {
+        return teamBMvpIgn;
+    }
+
+    public void setTeamBMvpIgn(String teamBMvpIgn) {
+        this.teamBMvpIgn = teamBMvpIgn;
+    }
+
+    public int getTeamBAssists() {
+        return teamBAssists;
+    }
+
+    public void setTeamBAssists(int teamBAssists) {
+        this.teamBAssists = teamBAssists;
     }
 }

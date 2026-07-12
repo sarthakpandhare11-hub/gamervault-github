@@ -22,7 +22,8 @@ public class BattleController {
 
     // 1. HOST A NEW BATTLE
     // Notice the new 'gameTitle' parameter
-    public static String hostBattle(String gameTitle, String mode, String format, double entryFee, String chosenTeam) {
+    public static String hostBattle(String gameTitle, String mode, String format, double entryFee, String chosenTeam,
+            long scheduledTime) {
         UserModel currentUser = AuthController.currentUser;
         if (currentUser == null)
             return null;
@@ -37,6 +38,7 @@ public class BattleController {
 
         // ADD MULTI-GAME TITLE
         battle.setGameTitle(gameTitle);
+        battle.setScheduledTime(scheduledTime);
 
         battle.setHostType("PLAYER");
         battle.setHostUserId(currentUser.getUserId());
@@ -100,15 +102,14 @@ public class BattleController {
         }
     }
 
-    // 2. JOIN AN EXISTING BATTLE
-    public static boolean joinBattle(String battleId) { // NOTE: Pass ID, not the Object
+    // 2. JOIN AN EXISTING BATTLE (Updated to require chosenTeam)
+    public static boolean joinBattle(String battleId, String chosenTeam) {
         UserModel currentUser = AuthController.currentUser;
         if (currentUser == null)
             return false;
 
         Firestore db = FirestoreClient.getFirestore();
-        DocumentReference ref = db.collection(BattleFirebaseKeys.COLLECTION_BATTLES)
-                .document(battleId);
+        DocumentReference ref = db.collection(BattleFirebaseKeys.COLLECTION_BATTLES).document(battleId);
 
         try {
             return db.runTransaction(txn -> {
@@ -118,36 +119,38 @@ public class BattleController {
                 if (battle.getParticipants().containsKey(currentUser.getUserId()))
                     return false; // Already in
                 if (battle.getParticipants().size() >= battle.getMaxParticipants())
-                    return false; // Full
+                    return false; // Full lobby
+
+                // NEW LOGIC: Check if the specific team they requested is full
+                long currentTeamSize = battle.getParticipants().values().stream()
+                        .filter(team -> team.equals(chosenTeam.toUpperCase())).count();
+
+                if (currentTeamSize >= battle.getMaxParticipants() / 2) {
+                    return false; // The chosen team is full! Transaction fails, UI should tell them to pick the
+                                  // other team.
+                }
 
                 // 1. Verify and deduct user balance ATOMICALLY
-                DocumentReference userRef = db
-                        .collection(UserFirebaseKeys.USERS_COLLECTION)
+                DocumentReference userRef = db.collection(UserFirebaseKeys.USERS_COLLECTION)
                         .document(currentUser.getUserId());
-                Double currentBalance = txn.get(userRef).get()
-                        .getDouble(UserFirebaseKeys.FIELD_COIN_BALANCE);
+                Double currentBalance = txn.get(userRef).get().getDouble(UserFirebaseKeys.FIELD_COIN_BALANCE);
                 if (currentBalance == null)
                     currentBalance = 0.0;
 
                 if (currentBalance < battle.getEntryFeeCoins())
-                    return false; // Insufficient funds! abort join.
+                    return false; // Insufficient funds
 
-                // Deduct fee
                 txn.update(userRef, UserFirebaseKeys.FIELD_COIN_BALANCE,
                         FieldValue.increment(-battle.getEntryFeeCoins()));
 
-                // 2. Assign Team
-                int currentSize = battle.getParticipants().size();
-                String team = (currentSize < battle.getMaxParticipants() / 2) ? "A" : "B";
-                battle.getParticipants().put(currentUser.getUserId(), team);
+                // 2. Assign Specifically Chosen Team
+                battle.getParticipants().put(currentUser.getUserId(), chosenTeam.toUpperCase());
                 battle.getParticipantIds().add(currentUser.getUserId());
 
                 // 3. Lock Room if Full
                 if (battle.getParticipants().size() == battle.getMaxParticipants()) {
                     battle.setStatus(BattleFirebaseKeys.STATUS_LOCKED);
                     battle.setLockedAt(System.currentTimeMillis());
-                    battle.setRoomId(String.valueOf(1000000 + new Random().nextInt(9000000)));
-                    battle.setRoomPassword(String.valueOf(1000 + new Random().nextInt(9000)));
                 }
 
                 txn.set(ref, battle);

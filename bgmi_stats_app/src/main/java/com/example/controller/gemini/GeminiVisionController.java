@@ -436,37 +436,42 @@ public class GeminiVisionController {
         }
     }
 
-    /**
-     * Sends TWO images to Gemini simultaneously to cross-reference and verify the
-     * match.
-     */
-    public static DualMatchResultModel analyzeDualMatchImages(byte[] imageABytes, byte[] imageBBytes,
-            String gameTitle) {
+    public static DualMatchResultModel analyzeDualMatchImages(byte[] imageABytes, byte[] imageBBytes) {
         DualMatchResultModel result = new DualMatchResultModel();
 
         try {
-            String base64ImageA = Base64.getEncoder().encodeToString(imageABytes);
-            String base64ImageB = Base64.getEncoder().encodeToString(imageBBytes);
+            String base64ImageA = java.util.Base64.getEncoder().encodeToString(imageABytes);
+            String base64ImageB = java.util.Base64.getEncoder().encodeToString(imageBBytes);
 
-            String gameContext = (gameTitle != null) ? gameTitle : "BGMI";
+            String prompt = "You are an expert OCR AI extracting structured data from two BGMI Team Deathmatch (TDM) result screenshots. "
+                    +
+                    "Analyze each image completely independently. Do not compare them to each other. Do not judge who won the match. "
+                    +
+                    "Only report exactly what is visibly printed on each individual image using spatial locations (Left vs Right).\n\n"
+                    +
+                    "For EACH image, extract:\n" +
+                    "1. bannerText: The large banner text at the top center (e.g. \"VICTORY\", \"DEFEAT\"). If missing, output \"NOT_A_RESULT_SCREEN\".\n"
+                    +
+                    "2. leftSideScore & rightSideScore: The large total team score numbers at the top left and top right.\n"
+                    +
+                    "3. leftSideMvpIgn: The in-game name of the top player on the Left side list. (Include any special characters or clan tags).\n"
+                    +
+                    "4. leftSideFinishes, leftSideFdRatio, leftSideAssists: The three stat numbers next to the Left MVP's name.\n"
+                    +
+                    "5. rightSideMvpIgn: The in-game name of the top player on the Right side list.\n" +
+                    "6. rightSideFinishes, rightSideFdRatio, rightSideAssists: The three stat numbers next to the Right MVP's name.\n"
+                    +
+                    "7. onScreenTimestamp: The date/time text at the very bottom left corner (e.g. \"2026-06-29 15:11\"). Output \"\" if unreadable.\n"
+                    +
+                    "8. matchSessionTag: The alphanumeric code right before the timestamp at the bottom left (e.g. \"/L24j6Kh>Xa\"). Output \"\" if unreadable.\n"
+                    +
+                    "9. imageQuality: \"CLEAR\" if text is highly legible, \"BLURRY\" or \"PARTIAL\" if difficult to read.\n\n"
+                    +
+                    "Respond ONLY with a valid JSON object matching this exact structure:\n" +
+                    "{\"imageOne\": {\"bannerText\": \"VICTORY\", \"leftSideScore\": 40, \"rightSideScore\": 38, \"leftSideMvpIgn\": \"404丨NOTFOUND\", \"leftSideFinishes\": 13, \"leftSideFdRatio\": 2.1, \"leftSideAssists\": 2, \"rightSideMvpIgn\": \"CLUMSYog\", \"rightSideFinishes\": 12, \"rightSideFdRatio\": 1.5, \"rightSideAssists\": 1, \"onScreenTimestamp\": \"2026-06-29 15:11\", \"matchSessionTag\": \"/L24j6Kh>Xa\", \"imageQuality\": \"CLEAR\"}, "
+                    +
+                    "\"imageTwo\": {\"bannerText\": \"DEFEAT\", \"leftSideScore\": 38, \"rightSideScore\": 40, \"leftSideMvpIgn\": \"CLUMSYog\", \"leftSideFinishes\": 12, \"leftSideFdRatio\": 1.5, \"leftSideAssists\": 1, \"rightSideMvpIgn\": \"404丨NOTFOUND\", \"rightSideFinishes\": 13, \"rightSideFdRatio\": 2.1, \"rightSideAssists\": 2, \"onScreenTimestamp\": \"2026-06-29 15:11\", \"matchSessionTag\": \"/L24j6Kh>Xa\", \"imageQuality\": \"CLEAR\"}}";
 
-            // The strict referee prompt mapped to the screenshot layout
-            String prompt = "You are an eSports referee verifying a " + gameContext + " match. " +
-                    "You are provided two screenshots. Image 1 is from Team A's perspective. Image 2 is from Team B's perspective. "
-                    +
-                    "1. Verify if both images are from the exact same match by cross-referencing final scores and IGNs. "
-                    +
-                    "2. Determine the winning team based ONLY on the perspective of Image 1 (Team A). " +
-                    "3. Extract the final score (top corners) and the MVP stats (Finishes, F/D, Assists) for both teams. "
-                    +
-                    "Respond ONLY with a valid JSON object matching this exact structure, nothing else: " +
-                    "{\"winnerSide\": \"A\", \"isSameMatch\": true, \"confidence\": 0.99, " +
-                    "\"teamA\": {\"score\": 23, \"mvpIgn\": \"CLUMSYog\", \"kills\": 23, \"fdRatio\": 1.5, \"assists\": 0}, "
-                    +
-                    "\"teamB\": {\"score\": 16, \"mvpIgn\": \"JORDJOHNNYxYT\", \"kills\": 16, \"fdRatio\": 0.7, \"assists\": 0}}";
-
-            // Assuming you have a standard HTTP client setup for Gemini in this class:
-            // Build the multi-part payload with BOTH images
             String jsonPayload = "{" +
                     "\"contents\": [{" +
                     "\"parts\": [" +
@@ -477,30 +482,68 @@ public class GeminiVisionController {
                     "}]" +
                     "}";
 
-            // Make the HTTP POST request to the Gemini API
-            String jsonResponse = sendHttpRequestToGemini(jsonPayload); // Replace with your actual internal HTTP call
-                                                                        // method
+            System.out.println("\n========== 🤖 GEMINI AI DEBUG: FORENSIC REQUEST ==========");
+            System.out.println("Executing spatial extraction...");
 
-            // Safely parse the JSON response
-            if (jsonResponse.contains("\"winnerSide\": \"A\"") || jsonResponse.contains("\"winnerSide\":\"A\"")) {
-                result.winnerSide = "A";
-            } else if (jsonResponse.contains("\"winnerSide\": \"B\"")
-                    || jsonResponse.contains("\"winnerSide\":\"B\"")) {
-                result.winnerSide = "B";
-            } else {
-                result.winnerSide = "UNCLEAR";
+            String rawApiResponse = sendHttpRequestToGemini(jsonPayload);
+
+            org.json.JSONObject apiJson = new org.json.JSONObject(rawApiResponse);
+            org.json.JSONArray candidates = apiJson.optJSONArray("candidates");
+
+            if (candidates == null || candidates.length() == 0)
+                return null;
+
+            String aiText = candidates.getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0)
+                    .getString("text");
+            String cleanJson = aiText.replaceAll("(?i)^```json\\s*", "").replaceAll("\\s*```$", "").trim();
+
+            org.json.JSONObject root = new org.json.JSONObject(cleanJson);
+
+            // Map Image One
+            org.json.JSONObject i1Json = root.optJSONObject("imageOne");
+            if (i1Json != null) {
+                result.imageOne = new DualMatchResultModel.ImageExtraction();
+                result.imageOne.bannerText = i1Json.optString("bannerText", "UNCLEAR");
+                result.imageOne.leftSideScore = i1Json.optInt("leftSideScore", 0);
+                result.imageOne.rightSideScore = i1Json.optInt("rightSideScore", 0);
+                result.imageOne.leftSideMvpIgn = i1Json.optString("leftSideMvpIgn", "");
+                result.imageOne.leftSideFinishes = i1Json.optInt("leftSideFinishes", 0);
+                result.imageOne.leftSideFdRatio = i1Json.optDouble("leftSideFdRatio", 0.0);
+                result.imageOne.leftSideAssists = i1Json.optInt("leftSideAssists", 0);
+                result.imageOne.rightSideMvpIgn = i1Json.optString("rightSideMvpIgn", "");
+                result.imageOne.rightSideFinishes = i1Json.optInt("rightSideFinishes", 0);
+                result.imageOne.rightSideFdRatio = i1Json.optDouble("rightSideFdRatio", 0.0);
+                result.imageOne.rightSideAssists = i1Json.optInt("rightSideAssists", 0);
+                result.imageOne.onScreenTimestamp = i1Json.optString("onScreenTimestamp", "");
+                result.imageOne.matchSessionTag = i1Json.optString("matchSessionTag", "");
+                result.imageOne.imageQuality = i1Json.optString("imageQuality", "UNCLEAR");
             }
 
-            result.isSameMatch = jsonResponse.contains("\"isSameMatch\": true")
-                    || jsonResponse.contains("\"isSameMatch\":true");
+            // Map Image Two
+            org.json.JSONObject i2Json = root.optJSONObject("imageTwo");
+            if (i2Json != null) {
+                result.imageTwo = new DualMatchResultModel.ImageExtraction();
+                result.imageTwo.bannerText = i2Json.optString("bannerText", "UNCLEAR");
+                result.imageTwo.leftSideScore = i2Json.optInt("leftSideScore", 0);
+                result.imageTwo.rightSideScore = i2Json.optInt("rightSideScore", 0);
+                result.imageTwo.leftSideMvpIgn = i2Json.optString("leftSideMvpIgn", "");
+                result.imageTwo.leftSideFinishes = i2Json.optInt("leftSideFinishes", 0);
+                result.imageTwo.leftSideFdRatio = i2Json.optDouble("leftSideFdRatio", 0.0);
+                result.imageTwo.leftSideAssists = i2Json.optInt("leftSideAssists", 0);
+                result.imageTwo.rightSideMvpIgn = i2Json.optString("rightSideMvpIgn", "");
+                result.imageTwo.rightSideFinishes = i2Json.optInt("rightSideFinishes", 0);
+                result.imageTwo.rightSideFdRatio = i2Json.optDouble("rightSideFdRatio", 0.0);
+                result.imageTwo.rightSideAssists = i2Json.optInt("rightSideAssists", 0);
+                result.imageTwo.onScreenTimestamp = i2Json.optString("onScreenTimestamp", "");
+                result.imageTwo.matchSessionTag = i2Json.optString("matchSessionTag", "");
+                result.imageTwo.imageQuality = i2Json.optString("imageQuality", "UNCLEAR");
+            }
 
             return result;
 
         } catch (Exception e) {
             e.printStackTrace();
-            result.winnerSide = "UNCLEAR";
-            result.isSameMatch = false;
-            return result;
+            return null;
         }
     }
 
@@ -536,7 +579,7 @@ public class GeminiVisionController {
      */
     public static String validateSingleMatchImage(byte[] imageBytes, String gameTitle) {
         try {
-            String base64Image = java.util.Base64.getEncoder().encodeToString(imageBytes);
+            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String gameContext = (gameTitle != null) ? gameTitle : "BGMI";
 
             String prompt = "You are an eSports referee verifying a " + gameContext + " match forfeit claim. " +
