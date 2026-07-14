@@ -36,12 +36,12 @@ public class TournamentController {
 
         boolean isSaved = TournamentDao.saveTournament(model);
         if (isSaved) {
-            // Push notification to all players and the admin activity log
-            NotificationController.sendNotification(
-                    "New Tournament: " + title,
-                    "Registration is now open! Prize Pool: " + prize,
-                    "TOURNAMENT",
-                    "GLOBAL");
+            // // Push notification to all players and the admin activity log
+            // NotificationController.sendNotification(
+            // "New Tournament: " + title,
+            // "Registration is now open! Prize Pool: " + prize,
+            // "TOURNAMENT",
+            // "GLOBAL");
         }
         return isSaved;
     }

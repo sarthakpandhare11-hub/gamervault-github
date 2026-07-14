@@ -1,8 +1,12 @@
 package com.example.view.player;
 
-import com.example.controller.AuthController;
+import java.util.concurrent.CompletableFuture;
+
+import com.example.controller.player.ConnectionController;
+import com.example.controller.player.DirectMessageController;
 import com.example.controller.player.ProfileController;
 import com.example.model.UserModel;
+import com.example.model.player.ProfileViewContext;
 import com.example.view.util.GamerVaultAnimations;
 import com.example.view.util.GamerVaultStyles;
 import com.example.view.util.SizedBox;
@@ -58,18 +62,20 @@ public class ProfileScreen {
         private ComboBox<String> primaryRoleCombo;
         private TextArea bioArea;
 
+        // UI References for Dynamic Access
+        private HBox settingsButtonsRow; // <--- ADDED to fix fragile index access
+
         // Context
         private Text emailText;
         private Text createdAtText;
         private Text vaultIdText;
 
-        // Avatar (future)
-        // private ImageView profileImageView;
         private Text avatarPlaceholder;
+
+        private ComboBox<String> privacyCombo;
 
         // METHODS
 
-        // Setters of the scene and stage of the Profile Screen
         public void setProfileScreenScene(Scene profileScreenScene) {
                 this.profileScreenScene = profileScreenScene;
         }
@@ -78,13 +84,6 @@ public class ProfileScreen {
                 this.profileScreenStage = profileScreenStage;
         }
 
-        /*
-         * This is the start of the ProfileScreen.
-         * This method begins the UI of the screen.
-         * 
-         * This method is the beginning of the UI of the screen.
-         * 
-         */
         public BorderPane startProfileScreen() {
                 BorderPane root = new BorderPane();
                 root.setStyle("-fx-background-color: transparent;");
@@ -103,26 +102,21 @@ public class ProfileScreen {
 
         private VBox createProfileContent() {
                 VBox container = new VBox(20);
-                container.setPadding(new Insets(10, 20, 40, 20)); // Top, Right, Bottom, Left
+                container.setPadding(new Insets(10, 20, 40, 20));
 
-                // 1. HERO BANNER
                 StackPane heroBanner = createHeroBanner();
                 GamerVaultAnimations.fadeInUp(heroBanner, 0, 500);
 
-                // 2. WIDE STATS BAR
                 HBox statsBar = createStatsBar();
                 GamerVaultAnimations.fadeInUp(statsBar, 150, 500);
 
-                // 3. MAIN CONTENT SPLIT (Settings Form vs Account Context)
                 HBox splitContent = new HBox(20);
 
-                // Left Side: Profile Settings Form
                 VBox settingsForm = createProfileSettingsForm();
-                HBox.setHgrow(settingsForm, Priority.ALWAYS); // Let it take most of the space
+                HBox.setHgrow(settingsForm, Priority.ALWAYS);
 
-                // Right Side: Context & Security Cards
                 VBox rightSidebar = new VBox(20);
-                rightSidebar.setPrefWidth(320); // Fixed width for sidebar cards
+                rightSidebar.setPrefWidth(320);
                 VBox accContext = createAccountContextCard();
                 VBox secActions = createSecurityActionsCard();
                 rightSidebar.getChildren().addAll(accContext, secActions);
@@ -135,24 +129,13 @@ public class ProfileScreen {
                 return container;
         }
 
-        /*
-         * HERO BANNER (Avatar, Name, Tags)
-         * This method is the creation of the complete banner of the player.
-         * It contains the avatar, name, tags and a purple circle to the right side of
-         * the hero banner.
-         * 
-         * It creates the 1st section of top row UI in Profile section.
-         */
         private StackPane createHeroBanner() {
                 StackPane bannerContainer = new StackPane();
                 bannerContainer.setPrefHeight(200);
 
-                // Rich Gradient/Map background
                 bannerContainer.setStyle(
                                 "-fx-background-color: linear-gradient(from 0% 0% to 100% 100%, #1a162e, #0c0817, #020617); -fx-background-radius: 16 16 0 0; -fx-border-color: rgba(255,255,255,0.08); -fx-border-width: 1 1 0 1; -fx-border-radius: 16 16 0 0;");
 
-                // Add an animated background blob to the banner
-                // A purple circle to the right side of the hero banner
                 Circle bannerBlob = GamerVaultAnimations.buildBlob(80, GamerVaultStyles.ACCENT_PURPLE, 0.3, 50);
                 StackPane.setAlignment(bannerBlob, Pos.TOP_RIGHT);
                 bannerBlob.setTranslateX(-50);
@@ -164,15 +147,13 @@ public class ProfileScreen {
                 contentBox.setAlignment(Pos.CENTER_LEFT);
                 contentBox.setPadding(new Insets(30, 30, 20, 30));
 
-                // AVATAR
                 StackPane avatarBox = new StackPane();
                 avatarBox.setPrefSize(120, 120);
                 avatarBox.setStyle(
                                 "-fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 16; -fx-border-color: "
                                                 + GamerVaultStyles.ACCENT_PURPLE
                                                 + "; -fx-border-width: 2; -fx-border-radius: 16;");
-                DropShadow avatarGlow = new DropShadow(15,
-                                Color.web(GamerVaultStyles.ACCENT_PURPLE, 0.4));
+                DropShadow avatarGlow = new DropShadow(15, Color.web(GamerVaultStyles.ACCENT_PURPLE, 0.4));
                 avatarBox.setEffect(avatarGlow);
 
                 avatarPlaceholder = new Text("👤");
@@ -180,12 +161,10 @@ public class ProfileScreen {
                 avatarPlaceholder.setFont(Font.font(60));
                 avatarBox.getChildren().add(avatarPlaceholder);
 
-                // USER INFO
                 VBox infoBox = new VBox(8);
                 infoBox.setAlignment(Pos.CENTER_LEFT);
                 VBox.setMargin(infoBox, new Insets(15, 0, 0, 0));
 
-                // Name Row
                 HBox nameRow = new HBox(15);
                 nameRow.setAlignment(Pos.BOTTOM_LEFT);
 
@@ -196,20 +175,17 @@ public class ProfileScreen {
                 ignText = new Text();
                 ignText.setFill(Color.web(GamerVaultStyles.ACCENT_PURPLE_LIGHT));
                 ignText.setFont(Font.font("Arial", FontWeight.BOLD, 22));
-                HBox.setMargin(ignText, new Insets(0, 0, 5, 0)); // Align visually with base of large text
+                HBox.setMargin(ignText, new Insets(0, 0, 5, 0));
 
                 nameRow.getChildren().addAll(playerNameText, ignText);
 
-                // Tags Row
                 HBox tagsRow = new HBox(10);
                 tagsRow.setAlignment(Pos.CENTER_LEFT);
 
-                // Replace the tagsRow content with this:
                 roleTagText = new Text("🎯 Entry Fragger");
                 regionTagText = new Text("🌍 India Region");
                 teamTagText = new Text("🤝 Team: S8UL");
 
-                // Style them here...
                 tagsRow.getChildren().addAll(
                                 createTag(roleTagText, "rgba(34,211,238,0.15)", GamerVaultStyles.ACCENT_CYAN),
                                 createTag(regionTagText, "rgba(255,255,255,0.1)", GamerVaultStyles.TEXT_PRIMARY),
@@ -222,14 +198,6 @@ public class ProfileScreen {
                 return bannerContainer;
         }
 
-        /*
-         * This method is used by the createHeroSection.
-         * This method creates the small rectangle UI boxes for the user info.
-         * 
-         * text - The text to be displayed in the tag.
-         * bgColor - The background color of the tag.
-         * textColorHex - The text color of the tag.
-         */
         private StackPane createTag(Text textNode, String bgColor, String textColorHex) {
                 StackPane tag = new StackPane();
                 tag.setPadding(new Insets(6, 12, 6, 12));
@@ -243,16 +211,12 @@ public class ProfileScreen {
                 return tag;
         }
 
-        /*
-         * This method help in arranging the UI that is horizontal row of the stat in
-         * Profile screen
-         */
         private HBox createStatsBar() {
                 HBox statsBar = new HBox(40);
                 statsBar.setPadding(new Insets(20, 30, 20, 30));
                 statsBar.setStyle(
                                 "-fx-background-color: " + GamerVaultStyles.CARD_BG + "; " +
-                                                "-fx-background-radius: 0 0 16 16; " + // Bottom corners rounded
+                                                "-fx-background-radius: 0 0 16 16; " +
                                                 "-fx-border-color: " + GamerVaultStyles.CARD_BORDER + "; " +
                                                 "-fx-border-width: 0 1 1 1; " +
                                                 "-fx-border-radius: 0 0 16 16;");
@@ -293,13 +257,6 @@ public class ProfileScreen {
                 return box;
         }
 
-        /*
-         * This method is the arrangement of the widgets of the form, that is player
-         * information.
-         * All the fields relate to the information of the player.
-         * 
-         * Arranged all the textfields and drop down fields in this method accordingly.
-         */
         private VBox createProfileSettingsForm() {
                 VBox formCard = new VBox(20);
                 formCard.setPadding(new Insets(25));
@@ -310,7 +267,6 @@ public class ProfileScreen {
                 primaryRoleCombo = new ComboBox<>();
                 bioArea = new TextArea();
 
-                // Header
                 HBox header = new HBox(10);
                 header.setAlignment(Pos.CENTER_LEFT);
                 Text icon = new Text("⚙");
@@ -321,7 +277,6 @@ public class ProfileScreen {
                 title.setFont(Font.font("Arial", FontWeight.BOLD, 22));
                 header.getChildren().addAll(icon, title);
 
-                // Row 1: Display Name & Username
                 HBox row1 = new HBox(20);
                 VBox displayNameBox = createInputField("Display Name", playerNameField);
                 VBox usernameBox = createInputField("Username (IGN)", ignField);
@@ -329,28 +284,35 @@ public class ProfileScreen {
                 HBox.setHgrow(usernameBox, Priority.ALWAYS);
                 row1.getChildren().addAll(displayNameBox, usernameBox);
 
-                // Row 2: Region & Primary Role
                 HBox row2 = new HBox(20);
-
-                // VBox roleBox = createDropdownField("Primary Role", "Entry Fragger ▼");
-                // HBox.setHgrow(roleBox, Priority.ALWAYS);
-                // row2.getChildren().addAll(roleBox);
                 primaryRoleCombo.getItems().addAll("Entry Fragger", "IGL", "Support", "Sniper");
                 primaryRoleCombo.setPrefHeight(45);
                 primaryRoleCombo.setMaxWidth(Double.MAX_VALUE);
                 primaryRoleCombo.setStyle(
                                 "-fx-background-color: " + GamerVaultStyles.INPUT_BG + "; -fx-text-fill: white;");
 
-                // 2. Add to layout
                 VBox roleBox = new VBox(8);
                 Text roleLabel = new Text("Primary Role");
                 roleLabel.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
                 roleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
                 roleBox.getChildren().addAll(roleLabel, primaryRoleCombo);
                 HBox.setHgrow(roleBox, Priority.ALWAYS);
-                row2.getChildren().addAll(roleBox);
 
-                // Row 3: Bio
+                privacyCombo = new ComboBox<>();
+                privacyCombo.getItems().addAll("PUBLIC", "PRIVATE");
+                privacyCombo.setPrefHeight(45);
+                privacyCombo.setMaxWidth(Double.MAX_VALUE);
+                privacyCombo.setStyle("-fx-background-color: " + GamerVaultStyles.INPUT_BG + "; -fx-text-fill: white;");
+
+                VBox privacyBox = new VBox(8);
+                Text privacyLabel = new Text("Account Privacy");
+                privacyLabel.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
+                privacyLabel.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+                privacyBox.getChildren().addAll(privacyLabel, privacyCombo);
+                HBox.setHgrow(privacyBox, Priority.ALWAYS);
+
+                row2.getChildren().addAll(roleBox, privacyBox);
+
                 VBox bioBox = new VBox(8);
                 Text bioLabel = new Text("Player Bio");
                 bioLabel.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
@@ -365,7 +327,6 @@ public class ProfileScreen {
                                                 + "-fx-text-fill: white; -fx-background-color: transparent; "
                                                 + "-fx-border-color: rgba(255,255,255,0.06); -fx-border-width: 1; -fx-border-radius: 10; -fx-background-radius: 10;");
 
-                // Focus glow for textarea
                 String focusStyle = "-fx-control-inner-background: " + GamerVaultStyles.INPUT_BG + "; "
                                 + "-fx-text-fill: white; -fx-background-color: transparent; "
                                 + "-fx-border-color: " + GamerVaultStyles.ACCENT_PURPLE
@@ -379,9 +340,9 @@ public class ProfileScreen {
 
                 bioBox.getChildren().addAll(bioLabel, bioArea);
 
-                // Buttons
-                HBox buttonsRow = new HBox(15);
-                buttonsRow.setAlignment(Pos.CENTER_RIGHT);
+                // --- NEW: Using Class Level Variable instead of Local ---
+                settingsButtonsRow = new HBox(15);
+                settingsButtonsRow.setAlignment(Pos.CENTER_RIGHT);
 
                 Button discardBtn = new Button("Discard");
                 discardBtn.setPrefHeight(35);
@@ -397,6 +358,8 @@ public class ProfileScreen {
                                 currentUser.setIgn(ignField.getText());
                                 currentUser.setBio(bioArea.getText());
                                 currentUser.setPrimaryRole(primaryRoleCombo.getValue());
+
+                                currentUser.setPrivacyStatus(privacyCombo.getValue());
 
                                 saveBtn.setText("Saving...");
                                 saveBtn.setDisable(true);
@@ -419,20 +382,13 @@ public class ProfileScreen {
                 GamerVaultStyles.applyGradientButton(saveBtn, GamerVaultStyles.ACCENT_PURPLE,
                                 GamerVaultStyles.ACCENT_PURPLE_DARK, "white");
 
-                buttonsRow.getChildren().addAll(discardBtn, saveBtn);
+                settingsButtonsRow.getChildren().addAll(discardBtn, saveBtn);
 
                 formCard.getChildren().addAll(header, SizedBox.height(10), row1, row2, bioBox, SizedBox.height(10),
-                                buttonsRow);
+                                settingsButtonsRow); // <-- Using the named reference
                 return formCard;
         }
 
-        /*
-         * This method helps in creation of the TextField with al the proper and similar
-         * styles to those TextFields.
-         * 
-         * labelStr - The label string of the field.
-         * value - The value string of the field.
-         */
         private VBox createInputField(String labelStr, TextField field) {
                 VBox box = new VBox(8);
                 Text label = new Text(labelStr);
@@ -446,37 +402,6 @@ public class ProfileScreen {
                 return box;
         }
 
-        /*
-         * This method is helper method for creating the dropdown field.
-         * 
-         * labelStr - The label string of the field.
-         * value - The value string of the field.
-         */
-        // private VBox createDropdownField(String labelStr, String value) {
-        // VBox box = new VBox(8);
-        // Text label = new Text(labelStr);
-        // label.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
-        // label.setFont(Font.font("Arial", FontWeight.BOLD, 12));
-
-        // Button field = new Button(value);
-        // field.setPrefHeight(45);
-        // field.setMaxWidth(Double.MAX_VALUE);
-        // field.setAlignment(Pos.CENTER_LEFT);
-        // GamerVaultStyles.applyGhostButton(field);
-        // // Override background to match input fields
-        // field.setStyle(field.getStyle() + "-fx-background-color: " +
-        // GamerVaultStyles.INPUT_BG + ";");
-
-        // box.getChildren().addAll(label, field);
-        // return box;
-        // }
-
-        /*
-         * RIGHT PANEL: ACCOUNT CONTEXT CARD
-         * This method UI is non editable, it is for only displaying.
-         * The UI shows the email Id registered and what day account is created along
-         * with a unique ID for the GamerVault app, to maintain a unique user.
-         */
         private VBox createAccountContextCard() {
                 VBox card = new VBox(20);
                 card.setPadding(new Insets(25));
@@ -507,28 +432,19 @@ public class ProfileScreen {
                 return card;
         }
 
-        /*
-         * This method is used for arranging the texts properly in the Right panel of
-         * the Profile Screen.
-         */
         private VBox createContextRow(String titleStr, Text valNode) {
                 VBox box = new VBox(5);
                 Text title = new Text(titleStr);
                 title.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
                 title.setFont(Font.font("Arial", FontWeight.BOLD, 11));
 
-                valNode.setFill(Color.WHITE); // Style the passed node
+                valNode.setFill(Color.WHITE);
                 valNode.setFont(Font.font("Arial", FontWeight.BOLD, 13));
                 box.getChildren().addAll(title, valNode);
 
                 return box;
         }
 
-        /*
-         * RIGHT PANEL: SECURITY ACTIONS CARD
-         * 
-         * This method have another button of logout from device in Profile screen.
-         */
         private VBox createSecurityActionsCard() {
                 VBox card = new VBox(15);
                 card.setPadding(new Insets(25));
@@ -561,62 +477,122 @@ public class ProfileScreen {
                 return card;
         }
 
-        private void loadUserProfile() {
-                if (AuthController.currentUser != null && AuthController.currentUser.getUserId() != null) {
-                        new Thread(() -> {
-                                UserModel fetchedUser = ProfileController
-                                                .getUserProfile(AuthController.currentUser.getUserId());
+        private ProfileViewContext currentContext;
 
-                                Platform.runLater(() -> {
-                                        currentUser = fetchedUser;
-                                        if (currentUser != null) {
-                                                populateProfile();
-                                        }
-                                });
-                        }).start();
-                } else {
-                        System.out.println("No active user session found.");
-                }
+        private void loadUserProfile() {
+                new Thread(() -> {
+                        ProfileViewContext context = ProfileController.getActiveProfileContext();
+                        Platform.runLater(() -> {
+                                this.currentContext = context;
+                                if (currentContext != null && currentContext.getUser() != null) {
+                                        this.currentUser = currentContext.getUser();
+                                        populateProfile();
+                                }
+                        });
+                }).start();
         }
 
         private void populateProfile() {
-
-                if (currentUser == null) {
+                if (currentUser == null || currentContext == null)
                         return;
-                }
 
-                // Hero Banner
+                // Populate basic text (Name, IGN, Tags)
                 playerNameText.setText(currentUser.getPlayerName());
                 ignText.setText(currentUser.getIgn());
+                roleTagText.setText("🎯 "
+                                + (currentUser.getPrimaryRole() != null ? currentUser.getPrimaryRole() : "Unassigned"));
+                regionTagText.setText("🌍 India");
+                teamTagText.setText("🤝 Team: Free Agent");
 
-                roleTagText.setText("🎯 " + currentUser.getPrimaryRole());
+                emailText.setText(currentContext.isOwnProfile() ? currentUser.getEmail() : "Hidden for privacy");
+                createdAtText.setText(
+                                currentUser.getCreatedAt() != null ? currentUser.getCreatedAt() : "Recently Joined");
+                String safeId = currentUser.getUserId().length() >= 8 ? currentUser.getUserId().substring(0, 8)
+                                : currentUser.getUserId();
+                vaultIdText.setText("GV-" + safeId.toUpperCase());
 
-                regionTagText.setText("🌍 India"); // Currently hardcoded
+                // --- PRIVACY GATE FOR STATS ---
+                if (currentContext.isPrivate() && !currentContext.isConnected() && !currentContext.isOwnProfile()) {
+                        totalMatchesText.setText("🔒");
+                        averageKillsText.setText("Private");
+                        averageDamageText.setText("Private");
+                        winRateText.setText("🔒");
+                } else {
+                        totalMatchesText.setText(String.valueOf(currentUser.getTotalMatches()));
+                        double kda = currentUser.getTotalMatches() > 0
+                                        ? (double) currentUser.getTotalKills() / currentUser.getTotalMatches()
+                                        : 0.0;
+                        averageKillsText.setText(String.format("%.1f", kda));
+                        averageDamageText.setText(String.valueOf(currentUser.getTotalDamage()));
+                        winRateText.setText(String.format("%.1f%%", currentUser.getWinRate()));
+                }
 
-                teamTagText.setText("🤝 Team : Free Agent");
-
-                // Form
+                // --- PRIVACY GATE FOR BUTTONS & FORM ---
                 playerNameField.setText(currentUser.getPlayerName());
                 ignField.setText(currentUser.getIgn());
                 bioArea.setText(currentUser.getBio());
 
-                totalMatchesText.setText(String.valueOf(currentUser.getTotalMatches()));
-                averageKillsText.setText(String.format("%.1f",
-                                (double) currentUser.getTotalKills() / currentUser.getTotalMatches()));
-                averageDamageText.setText(String.valueOf(currentUser.getTotalDamage()));
-                winRateText.setText(String.format("%.1f%%", currentUser.getWinRate()));
+                if (!currentContext.isOwnProfile()) {
+                        playerNameField.setEditable(false);
+                        ignField.setEditable(false);
+                        bioArea.setEditable(false);
+                        primaryRoleCombo.setDisable(true);
 
-                String idStr = currentUser.getUserId();
-                String safeId = idStr != null && idStr.length() >= 8 ? idStr.substring(0, 8) : idStr;
-                vaultIdText.setText("GV-" + (safeId != null ? safeId.toUpperCase() : "UNKNOWN"));
+                        String readOnlyStyle = "-fx-background-color: rgba(255,255,255,0.02); -fx-text-fill: #9CA3AF; -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 8;";
+                        playerNameField.setStyle(readOnlyStyle);
+                        ignField.setStyle(readOnlyStyle);
+                        bioArea.setStyle(readOnlyStyle);
 
-                if (currentUser.getPrimaryRole() != null) {
-                        primaryRoleCombo.setValue(currentUser.getPrimaryRole());
+                        Button actionBtn = new Button();
+                        actionBtn.setPrefHeight(40);
+                        actionBtn.setPadding(new Insets(0, 25, 0, 25));
+
+                        if (currentContext.isPrivate() && !currentContext.isConnected()) {
+                                // Not connected to a private profile -> Request Connection
+                                actionBtn.setText("🔗 Send Connection Request");
+                                actionBtn.setStyle(
+                                                "-fx-background-color: #374151; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-cursor: hand;");
+
+                                // --- FIX: Wired the Connection Controller ---
+                                actionBtn.setOnAction(e -> {
+                                        actionBtn.setText("Sending...");
+                                        actionBtn.setDisable(true);
+
+                                        CompletableFuture.runAsync(() -> {
+                                                boolean success = ConnectionController
+                                                                .sendRequest(currentUser.getUserId());
+                                                Platform.runLater(() -> {
+                                                        actionBtn.setText(
+                                                                        success ? "Request Sent ✓" : "Failed - Retry");
+                                                        if (!success)
+                                                                actionBtn.setDisable(false);
+                                                });
+                                        });
+                                });
+                        } else {
+                                // Public OR Connected -> Slide into DMs
+                                actionBtn.setText("⚡ Connect & Message");
+                                actionBtn.setStyle(
+                                                "-fx-background-color: linear-gradient(to right, #0EA5E9, #0284C7); -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-cursor: hand;");
+                                DropShadow glow = new DropShadow(15, Color.web("#0EA5E9", 0.4));
+                                actionBtn.setEffect(glow);
+
+                                actionBtn.setOnAction(e -> {
+                                        actionBtn.setText("Connecting...");
+                                        CompletableFuture.runAsync(() -> {
+                                                String roomId = DirectMessageController
+                                                                .initializeConnection(currentUser.getUserId());
+                                                Platform.runLater(() -> {
+                                                        if (roomId != null) {
+                                                                DirectMessageController.activeChatRoomId = roomId;
+                                                                PlayerDashboardSidebar.pageView = "directMessage";
+                                                                PlayerMainScreen.instance.updateCenter();
+                                                        }
+                                                });
+                                        });
+                                });
+                        }
+                        settingsButtonsRow.getChildren().setAll(actionBtn);
                 }
-
-                // Account
-                emailText.setText(currentUser.getEmail());
-                createdAtText.setText(currentUser.getCreatedAt());
-
         }
 }

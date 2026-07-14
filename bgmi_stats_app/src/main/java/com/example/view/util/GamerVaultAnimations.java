@@ -1,14 +1,23 @@
 package com.example.view.util;
 
-import javafx.animation.*;
+import javafx.animation.Animation;
+import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.ScaleTransition;
+import javafx.animation.Timeline;
+import javafx.animation.TranslateTransition;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.effect.GaussianBlur;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 
 /**
@@ -159,7 +168,8 @@ public class GamerVaultAnimations {
     /**
      * Slowly drifts and scales a blob for an organic, atmospheric feel.
      */
-    public static void animateGlow(Circle circle, double durationSec, double minX, double maxX, double minY, double maxY) {
+    public static void animateGlow(Circle circle, double durationSec, double minX, double maxX, double minY,
+            double maxY) {
         TranslateTransition tt = new TranslateTransition(Duration.seconds(durationSec), circle);
         tt.setFromX(minX);
         tt.setToX(maxX);
@@ -209,7 +219,8 @@ public class GamerVaultAnimations {
     }
 
     /**
-     * Attaches a mouse-move listener to a StackPane root so the cursor glow follows the mouse.
+     * Attaches a mouse-move listener to a StackPane root so the cursor glow follows
+     * the mouse.
      */
     public static void attachCursorGlow(StackPane root, Circle cursorGlow) {
         root.setOnMouseMoved(e -> {
@@ -259,7 +270,8 @@ public class GamerVaultAnimations {
 
     // ─── SHIMMER / COLOR CYCLE (for premium accent elements) ───────────────
     /**
-     * Creates a subtle color-cycling effect on a DropShadow, useful for logos or badges.
+     * Creates a subtle color-cycling effect on a DropShadow, useful for logos or
+     * badges.
      */
     public static void shimmerEffect(Node node, String color1, String color2, double durationSec) {
         DropShadow glow = new DropShadow(20, Color.web(color1, 0.5));
@@ -269,10 +281,133 @@ public class GamerVaultAnimations {
                 new KeyFrame(Duration.ZERO,
                         new KeyValue(glow.colorProperty(), Color.web(color1, 0.5))),
                 new KeyFrame(Duration.seconds(durationSec),
-                        new KeyValue(glow.colorProperty(), Color.web(color2, 0.5)))
-        );
+                        new KeyValue(glow.colorProperty(), Color.web(color2, 0.5))));
         timeline.setCycleCount(Animation.INDEFINITE);
         timeline.setAutoReverse(true);
         timeline.play();
+    }
+
+    // Creates a premium "Lift and Glow" effect for buttons
+    public static void applyPremiumHover(Node node, String glowColorHex) {
+        DropShadow glow = new DropShadow();
+        glow.setColor(Color.web(glowColorHex));
+        glow.setRadius(0);
+        glow.setSpread(0.5);
+        node.setEffect(glow);
+
+        node.setOnMouseEntered(e -> {
+            ScaleTransition st = new ScaleTransition(Duration.millis(150), node);
+            st.setToX(1.03);
+            st.setToY(1.03);
+            st.play();
+
+            // Animate the glow radius
+            Timeline timeline = new Timeline(
+                    new KeyFrame(Duration.millis(150),
+                            new KeyValue(glow.radiusProperty(), 15)));
+            timeline.play();
+            node.setStyle(node.getStyle() + "-fx-cursor: hand;");
+        });
+
+        node.setOnMouseExited(e -> {
+            ScaleTransition st = new ScaleTransition(Duration.millis(150), node);
+            st.setToX(1.0);
+            st.setToY(1.0);
+            st.play();
+
+            Timeline timeline = new Timeline(
+                    new KeyFrame(Duration.millis(150),
+                            new KeyValue(glow.radiusProperty(), 0)));
+            timeline.play();
+        });
+    }
+
+    // Slides a notification Toast down from the top
+    public static void slideInNotification(Node toast) {
+        TranslateTransition slide = new TranslateTransition(Duration.millis(400), toast);
+        slide.setFromY(-100);
+        slide.setToY(20);
+
+        FadeTransition fade = new FadeTransition(Duration.millis(400), toast);
+        fade.setFromValue(0);
+        fade.setToValue(1);
+
+        slide.play();
+        fade.play();
+    }
+
+    // ─── SHAKE ON ERROR ────────────────────────────────────────────────────
+    /**
+     * A rapid horizontal shake to indicate failure (wrong password, validation
+     * error).
+     */
+    public static void shakeOnError(Node node) {
+        TranslateTransition shake = new TranslateTransition(Duration.millis(50), node);
+        shake.setFromX(0);
+        shake.setByX(12); // Move 12 pixels right
+        shake.setCycleCount(6); // 3 shakes back and forth
+        shake.setAutoReverse(true);
+        shake.setOnFinished(e -> node.setTranslateX(0)); // Reset position securely
+        shake.playFromStart();
+    }
+
+    // ─── SAFE 2D PARALLAX HOVER (Replaces 3D Tilt) ─────────────────────────
+    /**
+     * Subtle 2D translation (parallax) instead of 3D rotation.
+     * Completely bypasses the JavaFX 3D BoxBounds rendering bug while keeping the
+     * premium feel.
+     */
+    public static void applyHoverTilt(Node node) {
+        node.setOnMouseMoved(e -> {
+            double width = node.getBoundsInLocal().getWidth();
+            double height = node.getBoundsInLocal().getHeight();
+            double centerX = width / 2;
+            double centerY = height / 2;
+
+            // Move slightly based on mouse position (max 6px movement)
+            double moveX = ((e.getX() - centerX) / centerX) * 4;
+            double moveY = ((e.getY() - centerY) / centerY) * 4;
+
+            node.setTranslateX(moveX);
+            node.setTranslateY(moveY);
+        });
+
+        node.setOnMouseExited(e -> {
+            TranslateTransition reset = new TranslateTransition(Duration.millis(200), node);
+            reset.setToX(0);
+            reset.setToY(0);
+            reset.setInterpolator(Interpolator.EASE_OUT);
+            reset.play();
+        });
+    }
+
+    // ─── SLIDING SCREEN SWAP (Kills the white flash) ───────────────────────
+    /**
+     * Smoothly slides the new screen in from the right.
+     */
+    public static void slideScreenSwap(Stage stage, Scene newScene) {
+        // 1. Force the physical scene background to BLACK to kill the white flash
+        // entirely
+        newScene.setFill(Color.BLACK);
+
+        Node newRoot = newScene.getRoot();
+
+        // 2. Position the new root off-screen to the right and transparent
+        newRoot.setTranslateX(150);
+        newRoot.setOpacity(0);
+
+        // 3. Swap the scene instantly (the background is now black, so zero flash)
+        stage.setScene(newScene);
+
+        // 4. Slide and fade in simultaneously
+        TranslateTransition slide = new TranslateTransition(Duration.millis(300), newRoot);
+        slide.setToX(0);
+        slide.setInterpolator(Interpolator.EASE_OUT);
+
+        FadeTransition fade = new FadeTransition(Duration.millis(300), newRoot);
+        fade.setToValue(1.0);
+
+        slide.play();
+        fade.play();
     }
 }

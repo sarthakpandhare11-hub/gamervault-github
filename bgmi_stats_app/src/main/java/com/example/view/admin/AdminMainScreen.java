@@ -218,21 +218,22 @@ public class AdminMainScreen {
                         e.getScreenY() + 20);
 
                 // Fetch Global Admin Activity live from Firestore
-                new Thread(() -> {
-                    List<NotificationModel> notifs = NotificationController.getGlobalAdminActivity();
-                    Platform.runLater(() -> {
-                        notificationsList.getChildren().clear();
-                        if (notifs.isEmpty()) {
-                            Text empty = new Text("No recent activity.");
-                            empty.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
-                            notificationsList.getChildren().add(empty);
-                        } else {
-                            for (NotificationModel n : notifs) {
-                                notificationsList.getChildren().add(createNotificationItem(n));
-                            }
-                        }
-                    });
-                }).start();
+                // new Thread(() -> {
+                // List<NotificationModel> notifs =
+                // NotificationController.getGlobalAdminActivity();
+                // Platform.runLater(() -> {
+                // notificationsList.getChildren().clear();
+                // if (notifs.isEmpty()) {
+                // Text empty = new Text("No recent activity.");
+                // empty.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+                // notificationsList.getChildren().add(empty);
+                // } else {
+                // for (NotificationModel n : notifs) {
+                // notificationsList.getChildren().add(createNotificationItem(n));
+                // }
+                // }
+                // });
+                // }).start();
             }
         });
 

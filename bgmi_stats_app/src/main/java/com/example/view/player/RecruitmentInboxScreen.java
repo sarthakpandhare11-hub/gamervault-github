@@ -1,6 +1,8 @@
 package com.example.view.player;
 
 import com.example.controller.player.ApplicationController;
+import com.example.controller.player.DirectMessageController;
+import com.example.controller.player.ProfileController;
 import com.example.model.player.ApplicationModel;
 import com.example.view.util.GamerVaultAnimations;
 import com.example.view.util.GamerVaultStyles;
@@ -158,6 +160,18 @@ public class RecruitmentInboxScreen {
         nameRoleBox.getChildren().addAll(nameLabel, roleBadge);
         identityBox.getChildren().addAll(avatar, nameRoleBox);
 
+        identityBox.setStyle("-fx-cursor: hand; -fx-padding: 5; -fx-background-radius: 8;");
+        identityBox.setOnMouseEntered(e -> identityBox.setStyle(
+                "-fx-cursor: hand; -fx-padding: 5; -fx-background-radius: 8; -fx-background-color: rgba(14, 165, 233, 0.1);"));
+        identityBox.setOnMouseExited(e -> identityBox.setStyle(
+                "-fx-cursor: hand; -fx-padding: 5; -fx-background-radius: 8; -fx-background-color: transparent;"));
+
+        identityBox.setOnMouseClicked(e -> {
+            ProfileController.setTargetProfile(app.getApplicantId());
+            PlayerDashboardSidebar.pageView = "profile";
+            PlayerMainScreen.instance.updateCenter();
+        });
+
         HBox statsBox = new HBox(15);
         statsBox.setAlignment(Pos.CENTER);
 
@@ -205,45 +219,51 @@ public class RecruitmentInboxScreen {
     }
 
     private void handleAction(ApplicationModel app, boolean accept, HBox cardUI) {
-        // FIX #2: Give the recruiter a way to contact the applicant on Accept before
-        // removing the card
         if (accept) {
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                    javafx.scene.control.Alert.AlertType.INFORMATION);
-            alert.setTitle("Connection Accepted");
-            alert.setHeaderText("You accepted " + app.getApplicantName() + "!");
-            alert.setContentText("The player has been notified.\n\nReach out to them externally using their Vault ID:\n"
-                    + app.getApplicantId());
-            alert.getDialogPane().setStyle(
-                    "-fx-background-color: #0B0F19; -fx-border-color: #10b981; -fx-border-width: 1; -fx-border-radius: 8;");
-            javafx.scene.Node contentLabel = alert.getDialogPane().lookup(".content.label");
-            if (contentLabel != null)
-                contentLabel.setStyle("-fx-text-fill: white;");
-            javafx.scene.Node headerLabel = alert.getDialogPane().lookup(".header-panel .label");
-            if (headerLabel != null)
-                headerLabel.setStyle("-fx-text-fill: white;");
-            alert.showAndWait();
-        }
+            // Find the accept button in the card to show a loading state
+            HBox actionBox = (HBox) cardUI.getChildren().get(cardUI.getChildren().size() - 1);
+            Button acceptBtn = (Button) actionBox.getChildren().get(1);
 
-        // GamerVaultAnimations.fadeOutDown(cardUI, 0, 300);
-        Platform.runLater(() -> {
+            Platform.runLater(() -> {
+                acceptBtn.setText("Connecting...");
+                acceptBtn.setStyle(
+                        "-fx-background-color: #0EA5E9; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;");
+            });
+
             new Thread(() -> {
-                try {
-                    Thread.sleep(300);
-                } catch (Exception ex) {
-                }
-                Platform.runLater(() -> inboxContainer.getChildren().remove(cardUI));
-            }).start();
-        });
+                // 1. Update application status in the database
+                boolean success = ApplicationController.accept(app);
 
-        new Thread(() -> {
-            // Passing the full object so the Controller can grab the applicantId for the
-            // notification
-            boolean success = accept ? ApplicationController.accept(app) : ApplicationController.decline(app);
-            if (!success) {
-                Platform.runLater(this::loadInbox);
-            }
-        }).start();
+                if (success) {
+                    // 2. Initialize the direct message room in Firebase
+                    String roomId = DirectMessageController.initializeConnection(app.getApplicantId());
+                    DirectMessageController.activeChatRoomId = roomId;
+
+                    Platform.runLater(() -> {
+                        // 3. Remove the card from the UI smoothly
+                        inboxContainer.getChildren().remove(cardUI);
+
+                        PlayerDashboardSidebar.pageView = "directMessage";
+                        PlayerMainScreen.instance.updateCenter();
+                    });
+                } else {
+                    Platform.runLater(this::loadInbox);
+                }
+            }).start();
+
+        } else {
+            // Decline Flow
+            Platform.runLater(() -> {
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(250);
+                    } catch (Exception ex) {
+                    }
+                    Platform.runLater(() -> inboxContainer.getChildren().remove(cardUI));
+                }).start();
+            });
+            new Thread(() -> ApplicationController.decline(app)).start();
+        }
     }
 
     // Helper: HUD Style Data Block

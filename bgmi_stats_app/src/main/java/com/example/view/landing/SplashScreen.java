@@ -176,9 +176,11 @@ public class SplashScreen extends Application {
         // Setting up the login screen with its scene and stage to navigate.
         LoginScreen loginScreen = new LoginScreen();
         loginScreen.setLoginScreenStage(splashScreenStage);
-        loginScreenScene = new Scene(loginScreen.startLoginScreen(), splashScreenStage.getWidth(),
-                splashScreenStage.getHeight());
+        loginScreenScene = new Scene(loginScreen.startLoginScreen(), splashScreenStage.getScene().getWidth(),
+                splashScreenStage.getScene().getHeight());
         loginScreen.setLoginScreenScene(loginScreenScene);
-        splashScreenStage.setScene(loginScreenScene);
+        // splashScreenStage.setScene(loginScreenScene);
+
+        GamerVaultAnimations.slideScreenSwap(splashScreenStage, loginScreenScene);
     }
 }

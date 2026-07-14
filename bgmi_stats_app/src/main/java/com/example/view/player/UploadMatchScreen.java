@@ -11,30 +11,46 @@ import com.example.controller.player.MatchController;
 
 import io.github.palexdev.materialfx.controls.MFXButton;
 import io.github.palexdev.materialfx.controls.MFXTextField;
-import io.github.palexdev.materialfx.controls.MFXProgressSpinner;
 import io.github.palexdev.materialfx.enums.FloatMode;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.ParallelTransition;
+import javafx.animation.PauseTransition;
+import javafx.animation.ScaleTransition;
+import javafx.animation.Timeline;
+import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.effect.BlurType;
 import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.GaussianBlur;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.ImagePattern;
+import javafx.scene.paint.LinearGradient;
+import javafx.scene.paint.Stop;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -57,16 +73,23 @@ public class UploadMatchScreen {
     // State & UI Components
     private List<File> uploadedImages = new ArrayList<>();
     private FlowPane imagesContainer;
+    private VBox emptyDropState;
 
     // Advanced View States
     private StackPane resultsContainer;
     private VBox skeletonLoaderView;
     private VBox actualTableView;
     private VBox resultsTableContainer;
-    private MFXProgressSpinner progressSpinner;
+
+    private StackPane aiLoaderNode;
+
     private MFXButton processButton;
     private HBox dynamicStepperContainer;
     private MFXButton saveMatchBtn;
+
+    private MFXButton addFilesBtn;
+
+    private VBox toastContainer;
 
     // LOGICAL VARIABLES (VARIABLES FOR UI HANDLING ON DATA)
     private MFXTextField matchNameField;
@@ -96,7 +119,16 @@ public class UploadMatchScreen {
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: transparent;");
-        root.setCenter(scroller);
+
+        toastContainer = new VBox(15);
+        toastContainer.setAlignment(Pos.BOTTOM_RIGHT);
+        toastContainer.setPadding(new Insets(30));
+        toastContainer.setPickOnBounds(false); // Let clicks pass through empty space to the UI below
+
+        StackPane contentOverlay = new StackPane();
+        contentOverlay.getChildren().addAll(scroller, toastContainer);
+
+        root.setCenter(contentOverlay);
         return root;
     }
 
@@ -291,7 +323,7 @@ public class UploadMatchScreen {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // MFX Browse Button
-        MFXButton addFilesBtn = new MFXButton("Browse Images  📁");
+        addFilesBtn = new MFXButton("Browse Images  📁");
         addFilesBtn.setPrefHeight(45);
         addFilesBtn.setPrefWidth(180);
         addFilesBtn.setStyle(
@@ -306,13 +338,18 @@ public class UploadMatchScreen {
         addFilesBtn.setOnAction(e -> {
             handleFilePicker(e);
         });
+        GamerVaultAnimations.scaleOnHoverAndPress(addFilesBtn, 1.03);
 
-        addFilesBtn.setOnMouseEntered(e -> addFilesBtn.setStyle(
-                "-fx-background-color: rgba(139,92,246,0.15); -fx-border-color: " + GamerVaultStyles.ACCENT_PURPLE
-                        + "; -fx-border-radius: 8; -fx-text-fill: white; -fx-cursor: hand; -fx-font-weight: bold;"));
-        addFilesBtn.setOnMouseExited(e -> addFilesBtn
-                .setStyle("-fx-background-color: transparent; -fx-border-color: " + GamerVaultStyles.ACCENT_PURPLE
-                        + "; -fx-border-radius: 8; -fx-text-fill: white; -fx-cursor: hand; -fx-font-weight: bold;"));
+        // addFilesBtn.setOnMouseEntered(e -> addFilesBtn.setStyle(
+        // "-fx-background-color: rgba(139,92,246,0.15); -fx-border-color: " +
+        // GamerVaultStyles.ACCENT_PURPLE
+        // + "; -fx-border-radius: 8; -fx-text-fill: white; -fx-cursor: hand;
+        // -fx-font-weight: bold;"));
+        // addFilesBtn.setOnMouseExited(e -> addFilesBtn
+        // .setStyle("-fx-background-color: transparent; -fx-border-color: " +
+        // GamerVaultStyles.ACCENT_PURPLE
+        // + "; -fx-border-radius: 8; -fx-text-fill: white; -fx-cursor: hand;
+        // -fx-font-weight: bold;"));
 
         titleRow.getChildren().addAll(sectionTitle, spacer, addFilesBtn);
 
@@ -333,8 +370,46 @@ public class UploadMatchScreen {
         imagesContainer = new FlowPane(15, 15);
         imagesContainer.setPadding(new Insets(10, 0, 10, 0));
 
-        leftCol.getChildren().addAll(titleRow, guidanceText, guidanceCards, imagesContainer);
+        // Empty-state placeholder — shown only while no screenshots have been added yet
+        emptyDropState = createEmptyDropState();
+
+        leftCol.getChildren().addAll(titleRow, guidanceText, guidanceCards, emptyDropState, imagesContainer);
         return leftCol;
+    }
+
+    /*
+     * Purely visual empty-state shown before any screenshots are uploaded, so the
+     * upload target area has a clear visual presence instead of blank space.
+     * Visibility is toggled inside updateImageContainerUI() based on whether
+     * uploadedImages is empty — no file-handling logic lives here.
+     */
+    private VBox createEmptyDropState() {
+        VBox placeholder = new VBox(10);
+        placeholder.setAlignment(Pos.CENTER);
+        placeholder.setPrefHeight(160);
+        placeholder.setPadding(new Insets(20));
+        placeholder.setStyle(
+                "-fx-background-color: rgba(255,255,255,0.015); " +
+                        "-fx-border-color: rgba(255,255,255,0.12); " +
+                        "-fx-border-style: dashed; " +
+                        "-fx-border-width: 2; " +
+                        "-fx-border-radius: 14; " +
+                        "-fx-background-radius: 14;");
+
+        Text icon = new Text("🖼️");
+        icon.setFont(Font.font(30));
+        GamerVaultAnimations.animateFloating(icon, 2.2, -4, 4);
+
+        Text label = new Text("No screenshots added yet");
+        label.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
+        label.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+
+        Text hint = new Text("Click Browse Images above to get started");
+        hint.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+        hint.setFont(Font.font("Arial", FontWeight.NORMAL, 11));
+
+        placeholder.getChildren().addAll(icon, label, hint);
+        return placeholder;
     }
 
     /*
@@ -343,28 +418,57 @@ public class UploadMatchScreen {
      * This is a static cards and nothing will change in them in the UI.
      * Creating card for dummy upload screenshot.
      */
-    private VBox createGuidanceMockup(String titleStr, String iconStr, String descStr, String image) {
-        VBox card = new VBox(8);
-        card.setAlignment(Pos.CENTER);
-        card.setPrefSize(180, 140);
-        card.setPadding(new Insets(15));
+    private StackPane createGuidanceMockup(String titleStr, String iconStr, String descStr, String imagePath) {
+        StackPane cardRoot = new StackPane();
+        // INCREASED SIZE: 260x160
+        cardRoot.setPrefSize(360, 220);
 
-        card.setStyle(
-                "-fx-background-color: rgba(255,255,255,0.02); " +
-                        "-fx-border-color: rgba(255,255,255,0.15); " +
-                        "-fx-border-style: dashed; " +
-                        "-fx-border-width: 2; " +
-                        "-fx-border-radius: 12; " +
-                        "-fx-background-radius: 12;");
+        // Glow
+        DropShadow ambientGlow = new DropShadow();
+        ambientGlow.setBlurType(BlurType.GAUSSIAN);
+        ambientGlow.setColor(Color.web(GamerVaultStyles.ACCENT_CYAN, 0.15));
+        ambientGlow.setRadius(15);
+        ambientGlow.setSpread(0.02);
+        cardRoot.setEffect(ambientGlow);
 
-        ImageView imageView = new ImageView(new Image(getClass().getResource("/assets/" + image).toExternalForm()));
-        imageView.setFitWidth(350);
-        imageView.setFitHeight(350);
-        imageView.setPreserveRatio(true);
+        Rectangle baseShape = new Rectangle(360, 220);
+        baseShape.setArcWidth(16);
+        baseShape.setArcHeight(16);
+
+        StackPane clippedContent = new StackPane();
+        clippedContent.setClip(baseShape);
+
+        // ADDED BORDER: 2px solid cyan border around the guidance mockups
+        clippedContent.setStyle("-fx-background-color: #121626; " +
+                "-fx-border-color: " + GamerVaultStyles.ACCENT_CYAN + "; " +
+                "-fx-border-width: 2; " +
+                "-fx-border-radius: 16;");
+
+        // Using ImagePattern to ensure it perfectly acts as the container base
+        Image img = new Image(getClass().getResource("/assets/" + imagePath).toExternalForm());
+        Rectangle imageCover = new Rectangle(360, 220);
+        imageCover.setFill(new ImagePattern(img));
+
+        StackPane imageWrapper = new StackPane(imageCover);
+        StackPane.setAlignment(imageWrapper, Pos.TOP_CENTER);
+
+        // Gradient Fade
+        Rectangle fadeOverlay = new Rectangle(360, 220);
+        LinearGradient fade = new LinearGradient(
+                0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.TRANSPARENT),
+                new Stop(0.3, Color.TRANSPARENT),
+                new Stop(0.8, Color.web("#121626")),
+                new Stop(1, Color.web("#121626")));
+        fadeOverlay.setFill(fade);
+
+        // Text Content Layout Tweaked for the wider size
+        VBox content = new VBox(6);
+        content.setAlignment(Pos.BOTTOM_CENTER);
+        content.setPadding(new Insets(0, 15, 12, 15));
 
         Text icon = new Text(iconStr);
-        icon.setFont(Font.font(36));
-        icon.setFill(Color.web("rgba(255, 255, 255, 0.46)"));
+        icon.setFont(Font.font(20));
 
         Text title = new Text(titleStr);
         title.setFill(Color.web(GamerVaultStyles.TEXT_PRIMARY));
@@ -372,12 +476,18 @@ public class UploadMatchScreen {
 
         Text desc = new Text(descStr);
         desc.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
-        desc.setFont(Font.font("Arial", FontWeight.NORMAL, 10));
-        desc.setWrappingWidth(140);
+        desc.setFont(Font.font("Arial", FontWeight.NORMAL, 11));
+        desc.setWrappingWidth(220);
         desc.setTextAlignment(TextAlignment.CENTER);
 
-        card.getChildren().addAll(imageView, SizedBox.height(3), icon, title, desc);
-        return card;
+        content.getChildren().addAll(icon, title, desc);
+
+        clippedContent.getChildren().addAll(imageWrapper, fadeOverlay, content);
+        cardRoot.getChildren().add(clippedContent);
+
+        attachPremiumCardHover(cardRoot, ambientGlow, imageWrapper);
+
+        return cardRoot;
     }
 
     /*
@@ -389,20 +499,24 @@ public class UploadMatchScreen {
         VBox rightCol = new VBox(20);
 
         VBox aiInfoCard = createAIInfoCard();
-
         HBox processBox = new HBox(15);
         processBox.setAlignment(Pos.CENTER);
 
-        progressSpinner = new MFXProgressSpinner();
-        progressSpinner.setPrefSize(40, 40);
-        progressSpinner.setStyle("-fx-progress-color: " + GamerVaultStyles.ACCENT_CYAN + ";");
-        progressSpinner.setVisible(false);
+        aiLoaderNode = new StackPane();
+        Circle outerPulse = new Circle(18, Color.web(GamerVaultStyles.ACCENT_PURPLE, 0.3));
+        outerPulse.setEffect(new GaussianBlur(8));
+        Circle innerCore = new Circle(10, Color.web(GamerVaultStyles.ACCENT_PURPLE_LIGHT));
+        aiLoaderNode.getChildren().addAll(outerPulse, innerCore);
+        aiLoaderNode.setVisible(false);
+
+        // Bind the continuous animations from your GamerVaultAnimations class
+        GamerVaultAnimations.pulseGlow(outerPulse, 0.8);
+        GamerVaultAnimations.pulseGlow(innerCore, 1.2);
 
         processButton = new MFXButton("START MATCH ANALYSIS ✨");
         processButton.setPrefHeight(60);
         processButton.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(processButton, Priority.ALWAYS);
-
         processButton.setStyle(
                 "-fx-background-color: linear-gradient(to right, " + GamerVaultStyles.ACCENT_PURPLE + ", "
                         + GamerVaultStyles.ACCENT_PURPLE_DARK + "); " +
@@ -410,11 +524,11 @@ public class UploadMatchScreen {
                         "-fx-font-family: 'Arial'; " +
                         "-fx-font-size: 14px; " +
                         "-fx-font-weight: bold; " +
-                        "-fx-background-radius: 10; " +
-                        "-fx-cursor: hand;");
-        DropShadow glow = new DropShadow(20, Color.web(GamerVaultStyles.ACCENT_PURPLE, 0.6));
-        processButton.setEffect(glow);
-        GamerVaultAnimations.scaleOnPress(processButton);
+                        "-fx-background-radius: 10;");
+
+        // --- NEW: Premium Hover / Lift applied ---
+        GamerVaultAnimations.applyPremiumHover(processButton, GamerVaultStyles.ACCENT_PURPLE);
+        attachRippleEffect(processButton, "#FFFFFF");
 
         // START AND PROCESS GEMINI ACTION BUTTON
         processButton.setOnAction(e -> {
@@ -422,7 +536,7 @@ public class UploadMatchScreen {
             handleProcessExecution();
         });
 
-        processBox.getChildren().addAll(progressSpinner, processButton);
+        processBox.getChildren().addAll(aiLoaderNode, processButton);
         rightCol.getChildren().addAll(aiInfoCard, processBox);
         return rightCol;
     }
@@ -434,11 +548,12 @@ public class UploadMatchScreen {
     private void handleProcessExecution() {
         // CHECKS IF USER HAS UPLOADED IMAGES ELSE SHOWS ERROR
         if (uploadedImages.isEmpty()) {
-            showNotification("Missing Screenshots", "Please upload screenshots before processing.");
+            GamerVaultAnimations.shakeOnError(addFilesBtn);
+            showNotification("Missing Screenshots", "Please upload screenshots before processing.", true);
             return;
         }
 
-        progressSpinner.setVisible(true);
+        aiLoaderNode.setVisible(true);
         processButton.setText("PROCESSING DATA...");
         processButton.setDisable(true);
         actualTableView.setVisible(false);
@@ -458,7 +573,7 @@ public class UploadMatchScreen {
                 currentAiResult = result;
 
                 // Reset loading UI
-                progressSpinner.setVisible(false);
+                aiLoaderNode.setVisible(false);
                 processButton.setText("START MATCH ANALYSIS ✨");
                 processButton.setDisable(false);
 
@@ -478,6 +593,7 @@ public class UploadMatchScreen {
                             String.valueOf(currentAiResult.getRating()),
                             false);
                     resultsTableContainer.getChildren().add(dataRow);
+                    GamerVaultAnimations.fadeInUp(dataRow, 100, 450);
 
                     skeletonLoaderView.setVisible(false);
                     actualTableView.setVisible(true);
@@ -489,13 +605,13 @@ public class UploadMatchScreen {
                     dynamicStepperContainer.getChildren().clear();
                     dynamicStepperContainer.getChildren().add(createStepsBox(3));
 
-                    showNotification("Extraction Complete", "Gemini successfully normalized match data.");
+                    showNotification("Extraction Complete", "Gemini successfully normalized match data.", false);
                 } else {
                     skeletonLoaderView.setVisible(false);
                     dynamicStepperContainer.getChildren().clear();
                     dynamicStepperContainer.getChildren().add(createStepsBox(1));
 
-                    showNotification("Extraction Failed", "Ensure images are clear BGMI screenshots.");
+                    showNotification("Extraction Failed", "Ensure images are clear BGMI screenshots.", true);
                 }
             });
         }).start();
@@ -571,6 +687,9 @@ public class UploadMatchScreen {
         saveMatchBtn.setStyle("-fx-background-color: " + GamerVaultStyles.ACCENT_GREEN
                 + "; -fx-text-fill: #000000; -fx-font-weight: bold; -fx-background-radius: 6; "
                 + "-fx-font-size: 12px; -fx-cursor: hand;");
+
+        GamerVaultAnimations.applyPremiumHover(saveMatchBtn, GamerVaultStyles.ACCENT_GREEN);
+        attachRippleEffect(saveMatchBtn, "#000000");
         saveMatchBtn.setOnAction(e -> saveMatchToDatabase());
 
         titleRow.getChildren().addAll(tableTitle, spacer, saveMatchBtn);
@@ -624,24 +743,75 @@ public class UploadMatchScreen {
         HBox modeBox = createCell(mode, font, textColor, 350, Pos.CENTER_LEFT);
 
         HBox placeBox = createCell(placement, font, isHeader ? textColor : Color.web("#F59E0B"), 120, Pos.CENTER);
-        HBox killsBox = createCell(kills, font, isHeader ? textColor : Color.web("#EF4444"), 70, Pos.CENTER);
+        HBox killsBox = isHeader
+                ? createCell(kills, font, textColor, 70, Pos.CENTER)
+                : createAnimatedCell(kills, font, Color.web("#EF4444"), 70, Pos.CENTER);
 
         // NEW: Assists Cell (Cyan accent for support stats)
-        HBox assistsBox = createCell(assists, font, isHeader ? textColor : Color.web(GamerVaultStyles.ACCENT_CYAN), 70,
-                Pos.CENTER);
+        HBox assistsBox = isHeader
+                ? createCell(assists, font, textColor, 70, Pos.CENTER)
+                : createAnimatedCell(assists, font, Color.web(GamerVaultStyles.ACCENT_CYAN), 70, Pos.CENTER);
 
-        HBox dmgBox = createCell(damage, font, textColor, 80, Pos.CENTER);
+        HBox dmgBox = isHeader
+                ? createCell(damage, font, textColor, 80, Pos.CENTER)
+                : createAnimatedCell(damage, font, textColor, 80, Pos.CENTER);
 
         // NEW: Survival Time Cell
         HBox timeBox = createCell(survivalTime, font, textColor, 90, Pos.CENTER);
 
-        HBox ratingBox = createCell(rating, font, isHeader ? textColor : Color.web(GamerVaultStyles.ACCENT_GREEN), 80,
-                Pos.CENTER_RIGHT);
+        HBox ratingBox = isHeader
+                ? createCell(rating, font, textColor, 80, Pos.CENTER_RIGHT)
+                : createAnimatedCell(rating, font, Color.web(GamerVaultStyles.ACCENT_GREEN), 80, Pos.CENTER_RIGHT);
 
         row.getChildren().addAll(mapBox, modeBox, SizedBox.width(15), placeBox, SizedBox.width(15), killsBox,
                 SizedBox.width(15), assistsBox, SizedBox.width(15), dmgBox, SizedBox.width(15), timeBox,
                 ratingBox);
         return row;
+    }
+
+    /*
+     * Sibling to createCell(), used only for the numeric data-row stat values
+     * (Kills, Assists, Damage, Rating). Counts up from 0 to the target value
+     * purely for visual reveal. If the text isn't a clean parseable number
+     * (e.g. "N/A"), the catch block leaves it exactly as createCell would have
+     * shown it - identical fallback behavior, no visual difference at all.
+     * The very last frame always sets the EXACT original string, guaranteeing
+     * the settled value is byte-for-byte what createCell would have produced.
+     */
+    private HBox createAnimatedCell(String text, Font font, Color color, double width, Pos alignment) {
+        HBox box = new HBox();
+        box.setAlignment(alignment);
+        box.setPrefWidth(width);
+        box.setMinWidth(width);
+
+        Text textNode = new Text(text != null ? text : "N/A");
+        textNode.setFont(font);
+        textNode.setFill(color);
+        box.getChildren().add(textNode);
+
+        try {
+            double target = Double.parseDouble(text.trim());
+            boolean isWhole = target == Math.floor(target);
+            textNode.setText(isWhole ? "0" : "0.0");
+
+            Timeline countUp = new Timeline();
+            int steps = 20;
+            for (int i = 1; i <= steps; i++) {
+                double progress = i / (double) steps;
+                double value = target * progress;
+                String frameText = isWhole ? String.valueOf(Math.round(value)) : String.format("%.1f", value);
+                countUp.getKeyFrames().add(new KeyFrame(
+                        Duration.millis(500 * progress), e -> textNode.setText(frameText)));
+            }
+            // Final guaranteed frame: the exact original string, no rounding drift
+            countUp.getKeyFrames()
+                    .add(new KeyFrame(Duration.millis(520), e -> textNode.setText(text)));
+            countUp.play();
+        } catch (Exception ignored) {
+            // Not a plain number - textNode already shows the original text untouched.
+        }
+
+        return box;
     }
 
     // Helper Method 2: Creates individual cells (matching LeaderboardScreen
@@ -691,69 +861,157 @@ public class UploadMatchScreen {
     private void updateImageContainerUI() {
         imagesContainer.getChildren().clear();
 
-        for (File file : uploadedImages) {
-            VBox fileCard = new VBox(8);
-            fileCard.setAlignment(Pos.CENTER);
-            fileCard.setPrefSize(240, 260);
-            fileCard.setStyle("-fx-background-color: " + GamerVaultStyles.INPUT_BG
-                    + "; -fx-background-radius: 12; -fx-border-color: rgba(255,255,255,0.08); -fx-border-radius: 12;");
-            fileCard.setPadding(new Insets(10));
+        if (emptyDropState != null) {
+            emptyDropState.setVisible(uploadedImages.isEmpty());
+            emptyDropState.setManaged(uploadedImages.isEmpty());
+        }
 
-            // Create Thumbnail Container with a clean, hard clipped border layout radius
-            StackPane imageWrapper = new StackPane();
-            imageWrapper.setPrefSize(220, 185);
-            imageWrapper.setMaxSize(220, 185);
+        for (File file : uploadedImages) {
+            StackPane cardRoot = new StackPane();
+            // INCREASED SIZE: 320x200
+            cardRoot.setPrefSize(360, 220);
+
+            // Ambient Glow
+            DropShadow ambientGlow = new DropShadow();
+            ambientGlow.setBlurType(BlurType.GAUSSIAN);
+            ambientGlow.setColor(Color.web(GamerVaultStyles.ACCENT_CYAN, 0.15));
+            ambientGlow.setRadius(20);
+            ambientGlow.setSpread(0.05);
+            cardRoot.setEffect(ambientGlow);
+
+            // Base Clip Mask for rounded corners
+            Rectangle baseShape = new Rectangle(360, 220);
+            baseShape.setArcWidth(16);
+            baseShape.setArcHeight(16);
+
+            StackPane clippedContent = new StackPane();
+            clippedContent.setClip(baseShape);
+            clippedContent.setStyle("-fx-background-color: #121626;");
 
             try {
-                // Lazy load local file thumbnail URI paths directly to ImageView layer pipeline
-                Image img = new Image(file.toURI().toString(), 220, 185, true, true);
-                ImageView imageView = new ImageView(img);
-                imageView.setFitWidth(220);
-                imageView.setFitHeight(185);
-                imageView.setPreserveRatio(true);
+                // THE FIX: Use ImagePattern on a Rectangle instead of ImageView to prevent
+                // bounding/squishing
+                Image img = new Image(file.toURI().toString());
+                Rectangle imageCover = new Rectangle(360, 220);
+                imageCover.setFill(new ImagePattern(img));
 
-                // Clip mask to enforce smooth background-radius boundaries on previews
-                Rectangle clip = new Rectangle(220, 185);
-                clip.setArcWidth(10);
-                clip.setArcHeight(10);
-                imageView.setClip(clip);
+                StackPane imageWrapper = new StackPane(imageCover);
+                StackPane.setAlignment(imageWrapper, Pos.TOP_CENTER);
 
-                imageWrapper.getChildren().add(imageView);
+                // Gradient Fade
+                Rectangle fadeOverlay = new Rectangle(360, 220);
+                LinearGradient fade = new LinearGradient(
+                        0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
+                        new Stop(0, Color.TRANSPARENT),
+                        new Stop(0.3, Color.TRANSPARENT),
+                        new Stop(0.8, Color.web("#121626")),
+                        new Stop(1, Color.web("#121626")));
+                fadeOverlay.setFill(fade);
+
+                // Data Pane
+                VBox dataPane = new VBox(10);
+                dataPane.setAlignment(Pos.BOTTOM_CENTER);
+                dataPane.setPadding(new Insets(0, 15, 20, 15));
+
+                Text fileName = new Text(file.getName());
+                fileName.setFill(Color.WHITE);
+                fileName.setFont(Font.font("Arial", FontWeight.BOLD, 12));
+                fileName.setWrappingWidth(290);
+                fileName.setTextAlignment(TextAlignment.CENTER);
+
+                MFXButton removeBtn = new MFXButton("Remove Evidence");
+                removeBtn.setStyle(
+                        "-fx-background-color: transparent; " +
+                                "-fx-border-color: rgba(239, 68, 68, 0.6); -fx-border-radius: 6; " +
+                                "-fx-text-fill: #EF4444; -fx-font-size: 11px; -fx-cursor: hand;");
+                removeBtn.setOnAction(e -> playRemoveExitThenUpdate(cardRoot, file));
+
+                dataPane.getChildren().addAll(fileName, removeBtn);
+
+                clippedContent.getChildren().addAll(imageWrapper, fadeOverlay, dataPane);
+                cardRoot.getChildren().add(clippedContent);
+
+                attachPremiumCardHover(cardRoot, ambientGlow, imageWrapper);
+
+                imagesContainer.getChildren().add(cardRoot);
+                GamerVaultAnimations.fadeInUp(cardRoot, 0, 300);
+
             } catch (Exception ex) {
-                // Safe fallback indicator block layer if file rendering fails
-                Text fallbackIcon = new Text("⚠️");
-                fallbackIcon.setFont(Font.font(28));
-                imageWrapper.getChildren().add(fallbackIcon);
+                System.out.println("Error rendering thumbnail: " + ex.getMessage());
             }
-
-            Text fileName = new Text(file.getName());
-            fileName.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
-            fileName.setFont(Font.font("Arial", FontWeight.NORMAL, 12));
-            fileName.setWrappingWidth(210);
-            fileName.setTextAlignment(TextAlignment.CENTER);
-
-            MFXButton removeBtn = new MFXButton("Remove");
-            removeBtn.setStyle(
-                    "-fx-text-fill: #EF4444; -fx-background-color: rgba(239,68,68,0.1); -fx-border-color: #EF4444; -fx-border-radius: 4; -fx-font-size: 10px; -fx-cursor: hand;");
-            removeBtn.setOnAction(e -> {
-                uploadedImages.remove(file);
-                updateImageContainerUI();
-            });
-
-            fileCard.getChildren().addAll(imageWrapper, fileName, removeBtn);
-            imagesContainer.getChildren().add(fileCard);
-
-            GamerVaultAnimations.fadeInUp(fileCard, 0, 300);
-            GamerVaultAnimations.scaleOnHover(fileCard, 1.05);
         }
     }
 
     /*
-     * ─── HELPER COMPONENTS ───────────────────────────────────────────────────
+     * Plays a quick fade + scale-down exit on a single image card, then performs
+     * the exact same removal that used to run instantly: uploadedImages.remove()
+     * followed by a full updateImageContainerUI() rebuild. No change to what
+     * gets removed or how the list is rebuilt — only when it visually happens.
      */
-    private void showNotification(String title, String message) {
-        System.out.println("FCM NOTIFICATION -> " + title + ": " + message);
-        // TODO; Integrate real Firebase FCM Toast Notification Logic here
+    /*
+     * Plays a quick fade + scale-down exit on a single image card, then performs
+     * the exact same removal that used to run instantly.
+     */
+    private void playRemoveExitThenUpdate(StackPane fileCard, File file) {
+        ScaleTransition scaleDown = new ScaleTransition(Duration.millis(220),
+                fileCard);
+        scaleDown.setToX(0.85);
+        scaleDown.setToY(0.85);
+        scaleDown.setInterpolator(Interpolator.EASE_IN);
+
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(220), fileCard);
+        fadeOut.setToValue(0);
+
+        ParallelTransition exit = new ParallelTransition(scaleDown, fadeOut);
+        exit.setOnFinished(ev -> {
+            uploadedImages.remove(file);
+            updateImageContainerUI();
+        });
+        exit.play();
+    }
+
+    /*
+     * Attaches a Material-style expanding ripple centered on the click point.
+     * The ripple circle is added to the button's own parent Pane with
+     * setManaged(false), so it never participates in that Pane's layout pass -
+     * existing siblings, spacing, and alignment are completely unaffected. This
+     * is purely a MOUSE_PRESSED visual listener added alongside whatever
+     * setOnAction handler the button already has; it never consumes the event
+     * or interferes with the button's normal click/action firing.
+     */
+    private void attachRippleEffect(Region button, String colorHex) {
+        button.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            Node parent = button.getParent();
+            if (!(parent instanceof Pane))
+                return;
+            Pane parentPane = (Pane) parent;
+
+            Circle ripple = new Circle(4, Color.web(colorHex, 0.35));
+            ripple.setManaged(false);
+            ripple.setMouseTransparent(true);
+
+            Point2D clickInParent = button.localToParent(e.getX(), e.getY());
+            ripple.setCenterX(clickInParent.getX());
+            ripple.setCenterY(clickInParent.getY());
+
+            parentPane.getChildren().add(ripple);
+
+            double targetRadius = Math.max(button.getWidth(), button.getHeight()) * 0.9;
+            Timeline grow = new Timeline(
+                    new KeyFrame(Duration.ZERO,
+                            new KeyValue(ripple.radiusProperty(), 4)),
+                    new KeyFrame(Duration.millis(450),
+                            new KeyValue(ripple.radiusProperty(), targetRadius,
+                                    Interpolator.EASE_OUT)));
+
+            FadeTransition fade = new FadeTransition(Duration.millis(450), ripple);
+            fade.setFromValue(0.7);
+            fade.setToValue(0);
+
+            ParallelTransition rippleAnim = new ParallelTransition(grow, fade);
+            rippleAnim.setOnFinished(ev -> parentPane.getChildren().remove(ripple));
+            rippleAnim.play();
+        });
     }
 
     /*
@@ -793,6 +1051,8 @@ public class UploadMatchScreen {
         VBox card = new VBox(15);
         card.setPadding(new Insets(25));
         GamerVaultStyles.applyGlassCard(card);
+
+        GamerVaultAnimations.applyHoverTilt(card);
 
         HBox header = new HBox(10);
         header.setAlignment(Pos.CENTER_LEFT);
@@ -946,6 +1206,18 @@ public class UploadMatchScreen {
         idxText.setFont(Font.font("Arial", FontWeight.BOLD, 11));
         circle.getChildren().add(idxText);
 
+        // Newly-active step gets a quick bounce-in pop so the 1→2→3 progression
+        // reads as a live event rather than an instant style swap.
+        if (isActive) {
+            circle.setScaleX(0.4);
+            circle.setScaleY(0.4);
+            ScaleTransition pop = new ScaleTransition(Duration.millis(350), circle);
+            pop.setToX(1.0);
+            pop.setToY(1.0);
+            pop.setInterpolator(Interpolator.SPLINE(0.34, 1.0, 0.64, 1.0));
+            pop.play();
+        }
+
         Text lblText = new Text(label);
         lblText.setFill(Color.web(isActive || isCompleted ? "#FFFFFF" : GamerVaultStyles.TEXT_MUTED));
         lblText.setFont(Font.font("Arial", isActive ? FontWeight.BOLD : FontWeight.NORMAL, 12));
@@ -963,12 +1235,13 @@ public class UploadMatchScreen {
         String gameType = typeCombo.getValue();
 
         if (customName == null || customName.isEmpty()) {
-            showNotification("Missing Metadata", "Please provide a Match Name before saving.");
+            GamerVaultAnimations.shakeOnError(matchNameField);
+            showNotification("Missing Metadata", "Please provide a Match Name before saving.", true);
             return;
         }
 
         // 1. Show loading state and disable button on the main thread
-        showNotification("Uploading...", "Saving evidence and stats to Vault...");
+        showNotification("Uploading...", "Saving evidence and stats to Vault...", false);
         if (saveMatchBtn != null) {
             saveMatchBtn.setDisable(true);
         }
@@ -989,9 +1262,9 @@ public class UploadMatchScreen {
 
             // 3. Push the UI updates back to the main thread
             Platform.runLater(() -> {
-                showNotification("Database Status", response);
-
                 if (response.startsWith("SUCCESS")) {
+                    showNotification("Database Status", "Saved successfully to Vault.", false);
+
                     // Reset the UI completely for the next upload
                     uploadedImages.clear();
                     updateImageContainerUI();
@@ -1003,11 +1276,16 @@ public class UploadMatchScreen {
                     dynamicStepperContainer.getChildren().clear();
                     dynamicStepperContainer.getChildren().add(createStepsBox(1));
 
+                    // Trigger the global notification listener for the top bar!
                     NotificationController.sendNotification(
                             "Match Telemetry Uploaded",
                             "Your match '" + customName + "' was successfully parsed by Gemini AI.",
                             "MATCH",
-                            userId);
+                            userId,
+                            "");
+                } else {
+                    // Show the backend error message in a red toast
+                    showNotification("Database Status", response, true);
                 }
 
                 if (saveMatchBtn != null) {
@@ -1015,5 +1293,99 @@ public class UploadMatchScreen {
                 }
             });
         }).start();
+    }
+
+    // --- NEW: Constructed real floating Toast UI ---
+    private void showNotification(String title, String message, boolean isError) {
+        Platform.runLater(() -> {
+            HBox toast = new HBox(15);
+            toast.setAlignment(Pos.CENTER_LEFT);
+            toast.setPadding(new Insets(15, 20, 15, 20));
+
+            // Build the card
+            GamerVaultStyles.applyGlassCard(toast);
+            String accentColor = isError ? "#EF4444" : GamerVaultStyles.ACCENT_GREEN;
+            toast.setStyle(toast.getStyle() + "-fx-border-color: " + accentColor + "; -fx-border-width: 1 1 1 4;");
+
+            Text titleText = new Text(title);
+            titleText.setFill(Color.WHITE);
+            titleText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+
+            Text msgText = new Text(message);
+            msgText.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+            msgText.setFont(Font.font("Arial", FontWeight.NORMAL, 12));
+            msgText.setWrappingWidth(250);
+
+            VBox textBox = new VBox(5, titleText, msgText);
+            toast.getChildren().add(textBox);
+
+            toastContainer.getChildren().add(toast);
+
+            // Re-use your built-in notification animation hook
+            GamerVaultAnimations.slideInNotification(toast);
+
+            // Auto-dismiss cleanup loop
+            PauseTransition delay = new PauseTransition(Duration.seconds(4));
+            delay.setOnFinished(e -> {
+                FadeTransition ft = new FadeTransition(Duration.millis(300), toast);
+                ft.setToValue(0);
+                ft.setOnFinished(ev -> toastContainer.getChildren().remove(toast));
+                ft.play();
+            });
+            delay.play();
+        });
+    }
+
+    private void attachPremiumCardHover(StackPane cardRoot, DropShadow glow, StackPane imageLayer) {
+        cardRoot.setOnMouseEntered(e -> {
+            // 1. Lift the card and scale up
+            ScaleTransition scale = new ScaleTransition(Duration.millis(250),
+                    cardRoot);
+            scale.setToX(1.04);
+            scale.setToY(1.04);
+            scale.setInterpolator(Interpolator.EASE_OUT);
+
+            // 2. Parallax: Move the image slightly independently of the card
+            TranslateTransition parallax = new TranslateTransition(
+                    Duration.millis(250), imageLayer);
+            parallax.setToY(-6); // Image moves up slightly inside the frame
+            parallax.setInterpolator(Interpolator.EASE_OUT);
+
+            // 3. Ignite the glow
+            Timeline glowAnim = new Timeline(
+                    new KeyFrame(Duration.millis(250),
+                            new KeyValue(glow.colorProperty(),
+                                    Color.web(GamerVaultStyles.ACCENT_CYAN, 0.45)),
+                            new KeyValue(glow.radiusProperty(), 35),
+                            new KeyValue(glow.spreadProperty(), 0.15)));
+
+            scale.play();
+            parallax.play();
+            glowAnim.play();
+            cardRoot.setCursor(javafx.scene.Cursor.HAND);
+        });
+
+        cardRoot.setOnMouseExited(e -> {
+            // Reverse everything
+            ScaleTransition scale = new ScaleTransition(Duration.millis(250),
+                    cardRoot);
+            scale.setToX(1.0);
+            scale.setToY(1.0);
+
+            TranslateTransition parallax = new TranslateTransition(
+                    Duration.millis(250), imageLayer);
+            parallax.setToY(0);
+
+            Timeline glowAnim = new Timeline(
+                    new KeyFrame(Duration.millis(250),
+                            new KeyValue(glow.colorProperty(),
+                                    Color.web(GamerVaultStyles.ACCENT_CYAN, 0.15)),
+                            new KeyValue(glow.radiusProperty(), 20),
+                            new KeyValue(glow.spreadProperty(), 0.05)));
+
+            scale.play();
+            parallax.play();
+            glowAnim.play();
+        });
     }
 }

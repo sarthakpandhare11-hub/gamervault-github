@@ -160,6 +160,12 @@ public class PlayerDashboardSidebar {
             pageView = "discover_content";
             mainScreen.updateCenter();
         });
+        Button socialFeedBtn = new Button("🌐 Social Feed");
+        applyStyling(socialFeedBtn, pageView.equals("socialFeed"));
+        socialFeedBtn.setOnAction(event -> {
+            pageView = "socialFeed";
+            mainScreen.updateCenter();
+        });
 
         sidebar.getChildren().addAll(
                 dashboardButton,
@@ -173,6 +179,7 @@ public class PlayerDashboardSidebar {
                 versusHistoryBtn,
                 recruitmentHubButton,
                 inboxBtn,
+                socialFeedBtn,
                 profileButton);
 
         Region spacer = new Region();
@@ -200,12 +207,14 @@ public class PlayerDashboardSidebar {
             LoginScreen loginScreen = new LoginScreen();
             loginScreen.setLoginScreenStage(currentStage);
 
+            // FIX: Use current inner dimensions and the Slide Screen Swap!
             Scene loginScene = new Scene(
                     loginScreen.startLoginScreen(),
-                    currentStage.getWidth(),
-                    currentStage.getHeight());
+                    currentStage.getScene().getWidth(),
+                    currentStage.getScene().getHeight());
             loginScreen.setLoginScreenScene(loginScene);
-            currentStage.setScene(loginScene);
+
+            GamerVaultAnimations.slideScreenSwap(currentStage, loginScene);
         });
 
         GamerVaultAnimations.scaleOnPress(logout);

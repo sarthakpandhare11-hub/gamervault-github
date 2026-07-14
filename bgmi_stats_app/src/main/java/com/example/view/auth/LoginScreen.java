@@ -220,6 +220,8 @@ public class LoginScreen {
         // Apply glassmorphism card styling
         GamerVaultStyles.applyGlassCard(rightBox);
 
+        GamerVaultAnimations.applyHoverTilt(rightBox);
+
         Text logoText = new Text("⚔ GamerVault");
         logoText.setFill(Color.web(GamerVaultStyles.ACCENT_PURPLE));
         logoText.setFont(Font.font("Arial", FontWeight.BOLD, 28));
@@ -237,8 +239,8 @@ public class LoginScreen {
         // 2) TextField area for EMAIL - with focus glow
         TextField emailTextField = new TextField();
         emailTextField.setPromptText("Enter your email");
-        HBox emailContainer = GamerVaultStyles.createStyledInput(emailTextField, GamerVaultStyles.ACCENT_PURPLE);
-        emailContainer.setPrefHeight(55);
+        HBox emailContainer = createFocusGlowInput(emailTextField, "✉", GamerVaultStyles.ACCENT_PURPLE);
+        // emailContainer.setPrefHeight(55);
 
         Text passwordText = new Text("ACCESS CODE");
         passwordText.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
@@ -338,6 +340,7 @@ public class LoginScreen {
         // Apply gradient button with scale animations
         GamerVaultStyles.applyGradientButton(loginButton, GamerVaultStyles.ACCENT_PURPLE,
                 GamerVaultStyles.ACCENT_PURPLE_DARK, "white");
+        GamerVaultAnimations.applyPremiumHover(loginButton, "#8800ffff");
 
         // LOGIN BUTTON ACTION
         loginButton.setOnAction(event -> {
@@ -374,6 +377,8 @@ public class LoginScreen {
                             navigateToPlayerMainScreen();
                         }
                     } else {
+                        GamerVaultAnimations.shakeOnError(rightBox);
+
                         errorMessageLabel.setText(responseMessage);
                         errorMessageLabel.setTextFill(Color.RED);
                         errorMessageLabel.setVisible(true);
@@ -423,8 +428,9 @@ public class LoginScreen {
 
         // REGISTER BUTTON - NEW PLAYERS REGISTER HERE
         Hyperlink registerButton = new Hyperlink("Register Now");
+        registerButton.setFocusTraversable(false); // FIX: Stops the CSS focus warning
         registerButton.setStyle("-fx-text-fill: " + GamerVaultStyles.ACCENT_PURPLE
-                + "; -fx-font-weight: bold; -fx-underline: false; -fx-font-size: 14px; -fx-padding: 0;");
+                + "; -fx-underline: false; -fx-font-size: 14px; -fx-padding: 0;");
         registerButton.setOnMouseEntered(e -> registerButton.setStyle(
                 "-fx-text-fill: " + GamerVaultStyles.ACCENT_CYAN
                         + "; -fx-font-weight: bold; -fx-underline: true; -fx-font-size: 14px; -fx-padding: 0;"));
@@ -485,6 +491,40 @@ public class LoginScreen {
         hiddenPassField.clear();
     }
 
+    // Local method to create interactive, glowing text inputs
+    private HBox createFocusGlowInput(TextField inputField, String iconPrompt, String accentColorHex) {
+        inputField.setStyle(
+                "-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-prompt-text-fill: #6B7280;");
+        inputField.setPrefHeight(45);
+        HBox.setHgrow(inputField, Priority.ALWAYS);
+
+        Text icon = new Text(iconPrompt);
+        icon.setFill(Color.web("#6B7280"));
+        icon.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+
+        HBox container = new HBox(10, icon, inputField);
+        container.setAlignment(Pos.CENTER_LEFT);
+        container.setPadding(new Insets(0, 15, 0, 15));
+        container.setStyle(
+                "-fx-background-color: #111827; -fx-border-color: rgba(255,255,255,0.1); -fx-border-width: 1; -fx-border-radius: 8; -fx-background-radius: 8;");
+
+        String defaultStyle = "-fx-background-color: #1A1F35; -fx-background-radius: 10; " +
+                "-fx-border-color: rgba(255,255,255,0.06); -fx-border-radius: 10; " +
+                "-fx-padding: 0 15 0 15; -fx-border-width: 1;";
+
+        String focusStyle = "-fx-background-color: #1A1F35; -fx-background-radius: 10; " +
+                "-fx-border-color: " + accentColorHex + "; -fx-border-radius: 10; " +
+                "-fx-padding: 0 15 0 15; -fx-border-width: 1.5; " +
+                "-fx-effect: dropshadow(three-pass-box, " + accentColorHex + "60, 10, 0, 0, 0);";
+
+        // The Focus Listener
+        inputField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            container.setStyle(isNowFocused ? focusStyle : defaultStyle);
+            icon.setFill(isNowFocused ? Color.web(accentColorHex) : Color.web("#6B7280"));
+        });
+        return container;
+    }
+
     // NAVIGATION METHODS
 
     /*
@@ -496,9 +536,12 @@ public class LoginScreen {
         RegistrationScreen registerationScreen = new RegistrationScreen();
         registerationScreen.setRegisterationScreenStage(loginScreenStage);
         registerationScreenScene = new Scene(registerationScreen.startRegisterationScreen(this::handleBackButton),
-                loginScreenStage.getWidth(), loginScreenStage.getHeight());
+                loginScreenStage.getScene().getWidth(),
+                loginScreenStage.getScene().getHeight());
         registerationScreen.setRegisterationScreenScene(registerationScreenScene);
-        loginScreenStage.setScene(registerationScreenScene);
+        // loginScreenStage.setScene(registerationScreenScene);
+
+        GamerVaultAnimations.slideScreenSwap(loginScreenStage, registerationScreenScene);
     }
 
     /*
@@ -510,12 +553,13 @@ public class LoginScreen {
 
         PlayerMainScreen playerMainScreen = new PlayerMainScreen();
         playerMainScreen.setPlayerMainScreenStage(loginScreenStage);
-        playerMainScreenScene = new Scene(
-                playerMainScreen.startPlayerMainScreen(this::handleBackButton), loginScreenStage.getWidth(),
-                loginScreenStage.getHeight());
+        playerMainScreenScene = new Scene(playerMainScreen.startPlayerMainScreen(this::handleBackButton),
+                loginScreenStage.getScene().getWidth(),
+                loginScreenStage.getScene().getHeight());
         playerMainScreen.setPlayerMainScreenScene(playerMainScreenScene);
 
-        loginScreenStage.setScene(playerMainScreenScene);
+        // loginScreenStage.setScene(playerMainScreenScene);
+        GamerVaultAnimations.slideScreenSwap(loginScreenStage, playerMainScreenScene);
     }
 
     /*
@@ -527,15 +571,18 @@ public class LoginScreen {
         AdminMainScreen adminMainScreen = new AdminMainScreen();
         adminMainScreen.setAdminMainScreenStage(loginScreenStage);
         adminMainScreenScene = new Scene(adminMainScreen.startAdminMainScreen(this::handleBackButton),
-                loginScreenStage.getWidth(), loginScreenStage.getHeight());
+                loginScreenStage.getScene().getWidth(),
+                loginScreenStage.getScene().getHeight());
 
         adminMainScreen.setAdminMainScreenScene(adminMainScreenScene);
 
-        loginScreenStage.setScene(adminMainScreenScene);
+        // loginScreenStage.setScene(adminMainScreenScene);
+        GamerVaultAnimations.slideScreenSwap(loginScreenStage, adminMainScreenScene);
 
     }
 
     void handleBackButton() {
-        loginScreenStage.setScene(loginScreenScene);
+        GamerVaultAnimations.slideScreenSwap(loginScreenStage, loginScreenScene);
+        // loginScreenStage.setScene(loginScreenScene);
     }
 }

@@ -55,17 +55,17 @@ public class AuthController {
                 newUser.setRole("PLAYER"); // Default role
 
                 boolean isSaved = UserController.createProfile(newUser);
-                if (isSaved) {
-                    // Log to the global system so Admins see the user growth in real-time
-                    NotificationController.sendNotification(
-                            "New Player Joined",
-                            userName + " has successfully registered on GamerVault.",
-                            "SYSTEM",
-                            "GLOBAL");
-                    return "User registered successfully! Login now";
-                } else {
-                    return "Failed to create profile. Please try again.";
-                }
+                // if (isSaved) {
+                // // Log to the global system so Admins see the user growth in real-time
+                // NotificationController.sendNotification(
+                // "New Player Joined",
+                // userName + " has successfully registered on GamerVault.",
+                // "SYSTEM",
+                // "GLOBAL");
+                // return "User registered successfully! Login now";
+                // } else {
+                // return "Failed to create profile. Please try again.";
+                // }
             } else {
                 return "Email already exist or Registration failed...";
             }

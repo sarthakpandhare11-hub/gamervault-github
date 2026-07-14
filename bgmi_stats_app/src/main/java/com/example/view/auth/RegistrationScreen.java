@@ -20,6 +20,7 @@ import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -122,6 +123,8 @@ public class RegistrationScreen {
                 // Apply glassmorphism card styling
                 GamerVaultStyles.applyGlassCard(mainContentBox);
 
+                GamerVaultAnimations.applyHoverTilt(mainContentBox);
+
                 // Main Large Title of GAMERVAULT with shimmer
                 Text mainTitle = new Text("GAMERVAULT");
                 mainTitle.setFill(Color.web(GamerVaultStyles.ACCENT_PURPLE_LIGHT));
@@ -143,10 +146,10 @@ public class RegistrationScreen {
                 PasswordField confirmPasswordTextField = new PasswordField();
 
                 // TEXTFIELD USERNAME FIELDS - with styled input
-                VBox userNameBox = createTextFieldBox("Username", "ProPlayer99", userNameTextField);
+                VBox userNameBox = createTextFieldBox("Username", "ProPlayer99", userNameTextField, "👤");
 
                 // TEXTFIELD EMAIL FIELDS - with styled input
-                VBox emailAddressBox = createTextFieldBox("Email Address", "player@gmail.com", emailTextField);
+                VBox emailAddressBox = createTextFieldBox("Email Address", "player@gmail.com", emailTextField, "📧");
 
                 // TEXTFIELD PASSWORD FIELD - with styled input
                 VBox passwordBox = createPassFieldBox("Password", "••••••••", passwordTextField);
@@ -191,6 +194,8 @@ public class RegistrationScreen {
                                                 errorMessageLabel.setTextFill(Color.GREEN);
                                                 errorMessageLabel.setVisible(true);
                                         } else {
+                                                GamerVaultAnimations.shakeOnError(mainContentBox);
+
                                                 errorMessageLabel.setText(errorMessage);
                                                 errorMessageLabel.setTextFill(Color.RED);
                                                 errorMessageLabel.setVisible(true);
@@ -209,6 +214,7 @@ public class RegistrationScreen {
 
                 // REGISTER BUTTON - NEW PLAYERS REGISTER HERE
                 Hyperlink loginButton = new Hyperlink("Login Here");
+                loginButton.setFocusTraversable(false); // FIX: Stops the CSS focus warning
                 loginButton.setStyle("-fx-text-fill: " + GamerVaultStyles.ACCENT_PURPLE
                                 + "; -fx-font-weight: bold; -fx-underline: false; -fx-font-size: 14px; -fx-padding: 0;");
                 loginButton.setOnMouseEntered(e -> loginButton.setStyle(
@@ -268,21 +274,58 @@ public class RegistrationScreen {
 
         // Create a UI for 1 complete TextField for this screen UI.
         /* Total 2 TextFields */
-        VBox createTextFieldBox(String mainText, String hintText, TextField textField) {
+        VBox createTextFieldBox(String mainText, String hintText, TextField textField, String iconSymbol) {
 
-                VBox textFieldBox = new VBox();
+                // VBox textFieldBox = new VBox();
+                // textFieldBox.setAlignment(Pos.TOP_LEFT);
+
+                // Text text = new Text(mainText);
+                // text.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
+
+                // textField.setPromptText(hintText);
+
+                // HBox styledContainer = GamerVaultStyles.createStyledInput(textField,
+                // GamerVaultStyles.ACCENT_PURPLE);
+                // styledContainer.setPrefHeight(55);
+
+                // textFieldBox.getChildren().setAll(text, SizedBox.height(10),
+                // styledContainer);
+
+                // return textFieldBox;
+                VBox textFieldBox = new VBox(8);
                 textFieldBox.setAlignment(Pos.TOP_LEFT);
 
                 Text text = new Text(mainText);
                 text.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
+                text.setFont(Font.font("Arial", FontWeight.BOLD, 12)); // Crisper label
 
                 textField.setPromptText(hintText);
+                textField.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px;");
+                HBox.setHgrow(textField, Priority.ALWAYS);
 
-                HBox styledContainer = GamerVaultStyles.createStyledInput(textField, GamerVaultStyles.ACCENT_PURPLE);
-                styledContainer.setPrefHeight(55);
+                Text icon = new Text(iconSymbol);
+                icon.setFill(Color.web("#6B7280"));
 
-                textFieldBox.getChildren().setAll(text, SizedBox.height(10), styledContainer);
+                HBox styledContainer = new HBox(10, icon, textField);
+                styledContainer.setAlignment(Pos.CENTER_LEFT);
+                styledContainer.setPadding(new Insets(0, 15, 0, 15));
+                styledContainer.setPrefHeight(50);
+                styledContainer.setStyle(
+                                "-fx-background-color: #111827; -fx-border-color: rgba(255,255,255,0.1); -fx-border-width: 1; -fx-border-radius: 8; -fx-background-radius: 8;");
 
+                textField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+                        if (isNowFocused) {
+                                styledContainer.setStyle(
+                                                "-fx-background-color: #1F2937; -fx-border-color: #8B5CF6; -fx-border-width: 2; -fx-border-radius: 8; -fx-background-radius: 8;");
+                                icon.setFill(Color.web("#8B5CF6")); // Purple glow for registration
+                        } else {
+                                styledContainer.setStyle(
+                                                "-fx-background-color: #111827; -fx-border-color: rgba(255,255,255,0.1); -fx-border-width: 1; -fx-border-radius: 8; -fx-background-radius: 8;");
+                                icon.setFill(Color.web("#6B7280"));
+                        }
+                });
+
+                textFieldBox.getChildren().setAll(text, styledContainer);
                 return textFieldBox;
         }
 

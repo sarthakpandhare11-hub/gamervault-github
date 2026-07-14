@@ -37,14 +37,14 @@ public class ContentController {
         }
 
         boolean isSaved = ContentDao.saveContent(model);
-        if (isSaved) {
-            // Push notification so players check out the new video/post
-            NotificationController.sendNotification(
-                    "New Content Dropped",
-                    "Watch now: " + title,
-                    "CONTENT",
-                    "GLOBAL");
-        }
+        // if (isSaved) {
+        // // Push notification so players check out the new video/post
+        // NotificationController.sendNotification(
+        // "New Content Dropped",
+        // "Watch now: " + title,
+        // "CONTENT",
+        // "GLOBAL");
+        // }
         return isSaved;
     }
 

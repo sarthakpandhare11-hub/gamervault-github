@@ -12,6 +12,8 @@ import com.example.view.util.GamerVaultAnimations;
 import com.example.view.util.GamerVaultStyles;
 import com.example.view.util.SizedBox;
 
+import javafx.animation.FadeTransition;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -38,6 +40,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class MatchHistoryScreen {
 
@@ -52,6 +55,7 @@ public class MatchHistoryScreen {
     private TextField searchField;
     private ComboBox<String> mapFilter;
     private BorderPane parentContainer;
+    private VBox toastContainer;
 
     // Documents from firestore will have all of the matches collected.
     private List<MatchModel> matchHistory;
@@ -84,8 +88,16 @@ public class MatchHistoryScreen {
         GamerVaultStyles.applyStyledScrollPane(scroller);
         scroller.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
-        root.setCenter(scroller);
+        toastContainer = new VBox(15);
+        toastContainer.setAlignment(Pos.BOTTOM_RIGHT);
+        toastContainer.setPadding(new Insets(30));
+        toastContainer.setPickOnBounds(false); // Let clicks pass through empty space to the UI below
 
+        // Wrap the scroller and the toast container in a StackPane
+        StackPane contentOverlay = new StackPane();
+        contentOverlay.getChildren().addAll(scroller, toastContainer);
+
+        root.setCenter(contentOverlay);
         return root;
     }
 
@@ -101,7 +113,7 @@ public class MatchHistoryScreen {
         VBox headerBox = createHeaderBox();
 
         statsRow = new HBox(20);
-        statsRow.getChildren().add(createStatCard("Loading...", "--"));
+        statsRow.getChildren().add(createStatCard("Loading...", "--", "⏳", GamerVaultStyles.TEXT_MUTED));
 
         searchField = new TextField();
         searchField.setPromptText("🔍  Search map, placement, or date...");
@@ -174,25 +186,88 @@ public class MatchHistoryScreen {
     }
 
     // Helper Method: Top Stat Cards
-    private VBox createStatCard(String titleStr, String valueStr) {
-        VBox card = new VBox(8);
+    private VBox createStatCard(String titleStr, String valueStr, String icon, String accentColor) {
+        VBox card = new VBox(12);
         card.setPrefSize(250, 130);
-        card.setPadding(new Insets(15, 20, 15, 20));
+        card.setPadding(new Insets(18, 20, 18, 20));
 
-        // Glassmorphism + hover scale
-        GamerVaultStyles.applyGlassCard(card);
-        GamerVaultAnimations.scaleOnHover(card, 1.04);
+        // Same left-accent-border language already used on the match cards below,
+        // so the top stat row and the match grid read as one consistent design.
+        card.setStyle(
+                "-fx-background-color: " + GamerVaultStyles.CARD_BG + "; " +
+                        "-fx-background-radius: 16; " +
+                        "-fx-border-color: " + GamerVaultStyles.CARD_BORDER + " " + GamerVaultStyles.CARD_BORDER
+                        + " " + GamerVaultStyles.CARD_BORDER + " " + accentColor + "; " +
+                        "-fx-border-width: 1 1 1 4; -fx-border-radius: 16;");
+
+        DropShadow cardShadow = new DropShadow(18, Color.web(accentColor, 0.18));
+        cardShadow.setOffsetY(4);
+        card.setEffect(cardShadow);
+
+        GamerVaultAnimations.scaleOnHover(card, 1.05);
+
+        HBox topRow = new HBox(10);
+        topRow.setAlignment(Pos.CENTER_LEFT);
+
+        StackPane iconBadge = new StackPane();
+        iconBadge.setPrefSize(34, 34);
+        iconBadge.setStyle("-fx-background-color: " + accentColor + "22; -fx-background-radius: 10;");
+        Text iconText = new Text(icon);
+        iconText.setFont(Font.font(15));
+        iconBadge.getChildren().add(iconText);
 
         Text title = new Text(titleStr);
         title.setFill(Color.web(GamerVaultStyles.TEXT_SECONDARY));
-        title.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+
+        topRow.getChildren().addAll(iconBadge, title);
 
         Text value = new Text(valueStr);
-        value.setFill(Color.web(GamerVaultStyles.TEXT_PRIMARY));
-        value.setFont(Font.font("Arial", FontWeight.BOLD, 44));
+        value.setFill(Color.web(accentColor));
+        value.setFont(Font.font("Arial", FontWeight.BOLD, 40));
 
-        card.getChildren().addAll(title, value);
+        card.getChildren().addAll(topRow, value);
+        animateCountUpText(value, valueStr);
         return card;
+    }
+
+    /*
+     * Defensive count-up reveal for a stat value. Handles a plain number
+     * ("450"), a decimal ("3.2"), or a numeric value with a trailing suffix
+     * ("72.5%"). If the text isn't cleanly parseable, the Text node is left
+     * exactly as it was constructed - identical fallback to a static label,
+     * so this can never display anything different from the original value.
+     */
+    private void animateCountUpText(Text node, String finalText) {
+        try {
+            String trimmed = finalText.trim();
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(-?\\d+(?:\\.\\d+)?)(.*)$")
+                    .matcher(trimmed);
+            if (!m.matches())
+                return;
+
+            double target = Double.parseDouble(m.group(1));
+            String suffix = m.group(2);
+            boolean isWhole = target == Math.floor(target) && !m.group(1).contains(".");
+
+            node.setText((isWhole ? "0" : "0.0") + suffix);
+
+            javafx.animation.Timeline countUp = new javafx.animation.Timeline();
+            int steps = 24;
+            for (int i = 1; i <= steps; i++) {
+                double progress = i / (double) steps;
+                double value = target * progress;
+                String frameText = (isWhole ? String.valueOf(Math.round(value)) : String.format("%.1f", value))
+                        + suffix;
+                countUp.getKeyFrames().add(new javafx.animation.KeyFrame(
+                        javafx.util.Duration.millis(600 * progress), e -> node.setText(frameText)));
+            }
+            countUp.getKeyFrames()
+                    .add(new javafx.animation.KeyFrame(javafx.util.Duration.millis(620), e -> node.setText(finalText)));
+            countUp.play();
+        } catch (Exception ignored) {
+            // Leave the node showing its original constructor-set text.
+        }
     }
 
     /*
@@ -585,13 +660,13 @@ public class MatchHistoryScreen {
         HBox.setHgrow(spacer3, Priority.ALWAYS);
 
         statsRow.getChildren().addAll(
-                createStatCard("Total Matches", String.valueOf(totalMatches)),
+                createStatCard("Total Matches", String.valueOf(totalMatches), "🎮", GamerVaultStyles.ACCENT_CYAN),
                 spacer1,
-                createStatCard("Avg Kills", String.format("%.1f", avgKills)),
+                createStatCard("Avg Kills", String.format("%.1f", avgKills), "🔫", "#EF4444"),
                 spacer2,
-                createStatCard("Avg Damage", String.format("%.0f", avgDamage)),
+                createStatCard("Avg Damage", String.format("%.0f", avgDamage), "💥", "#F59E0B"),
                 spacer3,
-                createStatCard("Win Rate", String.format("%.1f%%", winRate)));
+                createStatCard("Win Rate", String.format("%.1f%%", winRate), "🏆", GamerVaultStyles.ACCENT_GREEN));
         GamerVaultAnimations.fadeInUp(statsRow, 0, 500);
     }
 
@@ -630,14 +705,51 @@ public class MatchHistoryScreen {
                     match.getUserId(),
                     match.getMatchId());
             if (success) {
+                showNotification("Match Deleted", "The match record was permanently removed.", false);
                 loadAndDisplayMatchHistory();
             } else {
-                Alert error = new Alert(Alert.AlertType.ERROR);
-                error.setTitle("Delete Failed");
-                error.setHeaderText(null);
-                error.setContentText("Unable to delete the selected match.");
-                error.show();
+                showNotification("Delete Failed", "Unable to remove the match from the Vault.", true);
             }
         }
+    }
+
+    private void showNotification(String title, String message, boolean isError) {
+        Platform.runLater(() -> {
+            HBox toast = new HBox(15);
+            toast.setAlignment(Pos.CENTER_LEFT);
+            toast.setPadding(new Insets(15, 20, 15, 20));
+
+            // Build the card
+            GamerVaultStyles.applyGlassCard(toast);
+            String accentColor = isError ? "#EF4444" : GamerVaultStyles.ACCENT_GREEN;
+            toast.setStyle(toast.getStyle() + "-fx-border-color: " + accentColor + "; -fx-border-width: 1 1 1 4;");
+
+            Text titleText = new Text(title);
+            titleText.setFill(Color.WHITE);
+            titleText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+
+            Text msgText = new Text(message);
+            msgText.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+            msgText.setFont(Font.font("Arial", FontWeight.NORMAL, 12));
+            msgText.setWrappingWidth(250);
+
+            VBox textBox = new VBox(5, titleText, msgText);
+            toast.getChildren().add(textBox);
+
+            toastContainer.getChildren().add(toast);
+
+            // Trigger the animation
+            GamerVaultAnimations.slideInNotification(toast);
+
+            // Auto-dismiss cleanup loop
+            PauseTransition delay = new PauseTransition(Duration.seconds(4));
+            delay.setOnFinished(e -> {
+                FadeTransition ft = new FadeTransition(Duration.millis(300), toast);
+                ft.setToValue(0);
+                ft.setOnFinished(ev -> toastContainer.getChildren().remove(toast));
+                ft.play();
+            });
+            delay.play();
+        });
     }
 }

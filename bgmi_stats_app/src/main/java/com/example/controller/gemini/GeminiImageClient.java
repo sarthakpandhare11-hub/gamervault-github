@@ -1,5 +1,6 @@
 package com.example.controller.gemini;
 
+import com.example.view.util.ConfigManager;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -16,7 +17,7 @@ import java.util.Map;
 public class GeminiImageClient {
 
     private static final String API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
-    private static final String API_KEY = "AIzaSyCfaHXevra37pJAyyo7_B68K66AkgAzpeg";
+    private static final String API_KEY = ConfigManager.get("GEMINI_API_KEY");
 
     public static byte[] generateHolographicCardBytes(String prompt, String base64ReferenceImage) throws Exception {
 

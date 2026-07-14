@@ -164,9 +164,9 @@ public class TemplateManagementScreen {
                                 selectedFileNameText.setText("No image selected");
                                 selectedFileNameText.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
 
-                                NotificationController.sendNotification("New Generator Template!",
-                                        "The '" + newTemplate.getTemplateName() + "' card layout is now available.",
-                                        "CONTENT", "GLOBAL");
+                                // NotificationController.sendNotification("New Generator Template!",
+                                // "The '" + newTemplate.getTemplateName() + "' card layout is now available.",
+                                // "CONTENT", "GLOBAL");
                                 loadActiveTemplates();
                             } else {
                                 saveBtn.setText("Database Failed");

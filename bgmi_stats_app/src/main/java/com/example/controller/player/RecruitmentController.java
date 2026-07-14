@@ -1,5 +1,6 @@
 package com.example.controller.player;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,8 +31,11 @@ public class RecruitmentController {
         model.setTeamLogoURL(logoURL != null && !logoURL.isEmpty() ? logoURL : "");
 
         String upperTeam = teamName.toUpperCase();
-        model.setVerifiedTeam(
-                upperTeam.contains("S8UL") || upperTeam.contains("GODLIKE") || upperTeam.contains("GLOBAL"));
+
+        // TODO: Replace this array with the Database verified org list
+        List<String> verifiedOrgs = Arrays.asList("S8UL", "GODLIKE", "GLOBAL", "GENESIS", "SOUL", "REVNANT", "NXT");
+        boolean isVerified = verifiedOrgs.stream().anyMatch(upperTeam::contains);
+        model.setVerifiedTeam(isVerified);
 
         model.setRole(role.toUpperCase());
         model.setLineUpType(lineUpType.toUpperCase());
@@ -51,12 +55,12 @@ public class RecruitmentController {
 
         boolean isSaved = RecruitmentDao.saveRecruitmentRecord(model);
         if (isSaved) {
-            // Alert players that a team is looking for a specific role
             NotificationController.sendNotification(
                     "Roster Search: " + teamName,
                     teamName + " is officially recruiting a " + role + ". Check the Recruitment Hub!",
                     "SYSTEM",
-                    "GLOBAL");
+                    "GLOBAL",
+                    "recruitmentHub");
         }
         return isSaved;
     }

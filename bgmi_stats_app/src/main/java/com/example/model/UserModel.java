@@ -41,6 +41,14 @@ public class UserModel {
 
     private boolean suspended = false;
 
+    // --- NEW: PRIVACY & SOCIAL FIELDS ---
+    private String privacyStatus = "PUBLIC"; // "PUBLIC" or "PRIVATE"
+    private String availability = "";
+    private String competitiveTier = "UNRANKED";
+    private boolean t1ScrimExperience = false;
+    private String preferredWeapon = "";
+    private java.util.List<String> connectionIds = new java.util.ArrayList<>();
+
     // GETTER AND SETTERS FOR THE USER MODEL
 
     // GETTERS AND SETTERS
@@ -236,4 +244,53 @@ public class UserModel {
     public void setSuspended(boolean suspended) {
         this.suspended = suspended;
     }
+
+    public String getPrivacyStatus() {
+        return privacyStatus;
+    }
+
+    public void setPrivacyStatus(String privacyStatus) {
+        this.privacyStatus = privacyStatus;
+    }
+
+    public String getAvailability() {
+        return availability;
+    }
+
+    public void setAvailability(String availability) {
+        this.availability = availability;
+    }
+
+    public String getCompetitiveTier() {
+        return competitiveTier;
+    }
+
+    public void setCompetitiveTier(String competitiveTier) {
+        this.competitiveTier = competitiveTier;
+    }
+
+    public boolean isT1ScrimExperience() {
+        return t1ScrimExperience;
+    }
+
+    public void setT1ScrimExperience(boolean t1ScrimExperience) {
+        this.t1ScrimExperience = t1ScrimExperience;
+    }
+
+    public String getPreferredWeapon() {
+        return preferredWeapon;
+    }
+
+    public void setPreferredWeapon(String preferredWeapon) {
+        this.preferredWeapon = preferredWeapon;
+    }
+
+    public java.util.List<String> getConnectionIds() {
+        return connectionIds;
+    }
+
+    public void setConnectionIds(java.util.List<String> connectionIds) {
+        this.connectionIds = connectionIds;
+    }
+
 }

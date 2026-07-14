@@ -1,29 +1,18 @@
 package com.example.model;
 
 public class NotificationModel {
+    private String notificationId;
     private String id;
+
     private String title;
     private String message;
-    private String type; // "MATCH", "TOURNAMENT", "CONTENT", "SYSTEM"
+    private String type; // "MATCH", "TOURNAMENT", "SYSTEM", "CONTENT", "BATTLE"
+    private boolean isRead;
     private long timestamp;
 
+    // NEW: Needed for the live listener routing
     private String targetUserId;
-
-    public NotificationModel() {
-    }
-
-    public NotificationModel(
-            String id,
-            String title,
-            String message,
-            String type,
-            long timestamp) {
-        this.id = id;
-        this.title = title;
-        this.message = message;
-        this.type = type;
-        this.timestamp = timestamp;
-    }
+    private String actionRoute; // e.g., "BATTLE:12345" for deep linking
 
     public String getId() {
         return id;
@@ -31,6 +20,17 @@ public class NotificationModel {
 
     public void setId(String id) {
         this.id = id;
+        if (this.notificationId == null) {
+            this.notificationId = id; // Map old IDs to the new system automatically
+        }
+    }
+
+    public String getNotificationId() {
+        return notificationId;
+    }
+
+    public void setNotificationId(String notificationId) {
+        this.notificationId = notificationId;
     }
 
     public String getTitle() {
@@ -57,6 +57,14 @@ public class NotificationModel {
         this.type = type;
     }
 
+    public boolean isRead() {
+        return isRead;
+    }
+
+    public void setRead(boolean isRead) {
+        this.isRead = isRead;
+    }
+
     public long getTimestamp() {
         return timestamp;
     }
@@ -73,4 +81,11 @@ public class NotificationModel {
         this.targetUserId = targetUserId;
     }
 
+    public String getActionRoute() {
+        return actionRoute;
+    }
+
+    public void setActionRoute(String actionRoute) {
+        this.actionRoute = actionRoute;
+    }
 }

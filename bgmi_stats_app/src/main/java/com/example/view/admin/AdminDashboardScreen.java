@@ -734,42 +734,42 @@ public class AdminDashboardScreen {
         recentActivityList.getChildren().clear();
 
         // Fetch real global activity log from the Notification System
-        List<NotificationModel> globalLogs = NotificationController
-                .getGlobalAdminActivity();
+        // List<NotificationModel> globalLogs = NotificationController
+        // .getGlobalAdminActivity();
 
-        if (globalLogs == null || globalLogs.isEmpty()) {
-            Text emptyTxt = new Text("No system activity logged yet.");
-            emptyTxt.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
-            recentActivityList.getChildren().add(emptyTxt);
-        } else {
-            for (NotificationModel log : globalLogs) {
-                // Dynamically assign icons based on the event type
-                String icon = "📣";
-                if (log.getType() != null) {
-                    switch (log.getType()) {
-                        case "MATCH":
-                            icon = "🎮";
-                            break;
-                        case "TOURNAMENT":
-                            icon = "🏆";
-                            break;
-                        case "CONTENT":
-                            icon = "🎥";
-                            break;
-                        case "SYSTEM":
-                            icon = "⚙";
-                            break;
-                    }
-                }
+        // if (globalLogs == null || globalLogs.isEmpty()) {
+        // Text emptyTxt = new Text("No system activity logged yet.");
+        // emptyTxt.setFill(Color.web(GamerVaultStyles.TEXT_MUTED));
+        // recentActivityList.getChildren().add(emptyTxt);
+        // } else {
+        // for (NotificationModel log : globalLogs) {
+        // // Dynamically assign icons based on the event type
+        // String icon = "📣";
+        // if (log.getType() != null) {
+        // switch (log.getType()) {
+        // case "MATCH":
+        // icon = "🎮";
+        // break;
+        // case "TOURNAMENT":
+        // icon = "🏆";
+        // break;
+        // case "CONTENT":
+        // icon = "🎥";
+        // break;
+        // case "SYSTEM":
+        // icon = "⚙";
+        // break;
+        // }
+        // }
 
-                // Add the real log to the UI
-                recentActivityList.getChildren().add(createActivityItem(
-                        icon,
-                        log.getTitle() != null ? log.getTitle() : "System Alert",
-                        log.getMessage() != null ? log.getMessage() : "",
-                        "Recent"));
-            }
-        }
+        // // Add the real log to the UI
+        // recentActivityList.getChildren().add(createActivityItem(
+        // icon,
+        // log.getTitle() != null ? log.getTitle() : "System Alert",
+        // log.getMessage() != null ? log.getMessage() : "",
+        // "Recent"));
+        // }
+        // }
     }
 
     private void populateContentSnapshot(List<ContentModel> content) {
