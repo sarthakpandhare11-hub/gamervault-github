@@ -531,6 +531,10 @@ public class ProfileScreen {
                 playerNameField.setText(currentUser.getPlayerName());
                 ignField.setText(currentUser.getIgn());
                 bioArea.setText(currentUser.getBio());
+                primaryRoleCombo.setValue(
+                                currentUser.getPrimaryRole() != null ? currentUser.getPrimaryRole() : "Entry Fragger");
+                privacyCombo.setValue(
+                                currentUser.getPrivacyStatus() != null ? currentUser.getPrivacyStatus() : "PUBLIC");
 
                 if (!currentContext.isOwnProfile()) {
                         playerNameField.setEditable(false);
@@ -549,24 +553,42 @@ public class ProfileScreen {
 
                         if (currentContext.isPrivate() && !currentContext.isConnected()) {
                                 // Not connected to a private profile -> Request Connection
-                                actionBtn.setText("🔗 Send Connection Request");
+                                actionBtn.setText("Checking status...");
+                                actionBtn.setDisable(true);
                                 actionBtn.setStyle(
                                                 "-fx-background-color: #374151; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-cursor: hand;");
 
-                                // --- FIX: Wired the Connection Controller ---
-                                actionBtn.setOnAction(e -> {
-                                        actionBtn.setText("Sending...");
-                                        actionBtn.setDisable(true);
+                                // Check whether a request is already pending before assuming this is a
+                                // fresh, unsent state - otherwise revisiting the profile after sending a
+                                // request would show "Send Connection Request" again every time.
+                                CompletableFuture.runAsync(() -> {
+                                        String status = ConnectionController
+                                                        .getConnectionStatusWith(currentUser.getUserId());
+                                        Platform.runLater(() -> {
+                                                if ("PENDING".equals(status)) {
+                                                        actionBtn.setText("⏳ Request Pending");
+                                                        actionBtn.setDisable(true);
+                                                } else {
+                                                        actionBtn.setText("🔗 Send Connection Request");
+                                                        actionBtn.setDisable(false);
+                                                        actionBtn.setOnAction(e -> {
+                                                                actionBtn.setText("Sending...");
+                                                                actionBtn.setDisable(true);
 
-                                        CompletableFuture.runAsync(() -> {
-                                                boolean success = ConnectionController
-                                                                .sendRequest(currentUser.getUserId());
-                                                Platform.runLater(() -> {
-                                                        actionBtn.setText(
-                                                                        success ? "Request Sent ✓" : "Failed - Retry");
-                                                        if (!success)
-                                                                actionBtn.setDisable(false);
-                                                });
+                                                                CompletableFuture.runAsync(() -> {
+                                                                        boolean success = ConnectionController
+                                                                                        .sendRequest(currentUser
+                                                                                                        .getUserId());
+                                                                        Platform.runLater(() -> {
+                                                                                actionBtn.setText(
+                                                                                                success ? "Request Sent ✓"
+                                                                                                                : "Failed - Retry");
+                                                                                if (!success)
+                                                                                        actionBtn.setDisable(false);
+                                                                        });
+                                                                });
+                                                        });
+                                                }
                                         });
                                 });
                         } else {

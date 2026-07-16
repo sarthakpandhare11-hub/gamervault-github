@@ -6,7 +6,6 @@ import com.example.dao.GamerMomentDao;
 import com.example.model.player.GamerMomentModel;
 import com.example.view.util.GamerVaultAnimations;
 import com.example.view.util.GamerVaultStyles;
-import com.example.view.util.SizedBox;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;

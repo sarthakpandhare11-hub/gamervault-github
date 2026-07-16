@@ -1,6 +1,5 @@
 package com.example.view.player;
 
-import com.example.controller.AuthController;
 import com.example.controller.player.ProfileController;
 import com.example.dao.BattleDao;
 import com.example.model.player.BattleModel;

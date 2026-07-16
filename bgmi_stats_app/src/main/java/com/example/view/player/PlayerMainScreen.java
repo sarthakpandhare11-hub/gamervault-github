@@ -148,6 +148,8 @@ public class PlayerMainScreen {
                 return new DirectMessageScreen().startChatScreen();
             case "socialFeed":
                 return new SocialFeedScreen().startFeedScreen();
+            case "connectionRequests":
+                return new ConnectionRequestsScreen().startConnectionRequestsScreen();
             default:
                 return new BorderPane();
         }
